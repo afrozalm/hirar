@@ -174,35 +174,55 @@ class DTN(object):
             # logits and accuracy
             self.real_enc, self.real_logits = self.encoder(self.real_images,
                                                            scope_suffix='real')
-            self.caric_enc, self.caric_logits = self.encoder(self.caric_images)
+            self.caric_enc, self.caric_logits = self.encoder(self.caric_images,
+                                                             scope_suffix='caric')
 
-            self.images = tf.concat([self.real_images, self.caric_images], 0)
-            self.labels = tf.concat([self.real_labels, self.caric_labels], 0)
-            self.logits = tf.concat([self.real_logits, self.caric_logits], 0)
-
-            self.pred = tf.argmax(self.logits, 1)
-            self.correct_pred = tf.equal(self.pred,
-                                         self.labels)
-            self.accuracy = tf.reduce_mean(tf.cast(self.correct_pred,
-                                                   tf.float32))
-
-            self.reconst_carics = []
-            self.reconst_real = self.decoder(self.real_enc[-1],
-                                             scope_suffix='real',
-                                             layer=5)
+            # self.images = tf.concat([self.real_images, self.caric_images], 0)
+            self.reconst_carics, self.reconst_reals = [], []
+            reuse = False
+            for layer, feature in zip(xrange(5, 0, -1),
+                                      reversed(self.real_enc)):
+                self.reconst_reals.insert(0, self.decoder(feature,
+                                                          layer=layer,
+                                                          scope_suffix='real',
+                                                          reuse=reuse))
+                reuse = True
             reuse = False
             for layer, feature in zip(xrange(5, 0, -1),
                                       reversed(self.caric_enc)):
-                self.reconst_carics.append(self.decoder(feature,
-                                                        layer=layer,
-                                                        scope_suffix='caric',
-                                                        reuse=reuse))
+                self.reconst_carics.insert(0, self.decoder(feature,
+                                                           layer=layer,
+                                                           scope_suffix='caric',
+                                                           reuse=reuse))
                 reuse = True
 
+            _, self.fake_caric_logits = self.encoder(self.reconst_carics[-1],
+                                                     scope_suffix='caric',
+                                                     reuse=True)
+            _, self.fake_real_logits = self.encoder(self.reconst_reals[-1],
+                                                    scope_suffix='real',
+                                                    reuse=True)
+            self.labels = tf.concat([self.real_labels, self.caric_labels], 0)
+            self.logits = tf.concat([self.real_logits, self.caric_logits], 0)
+            self.fake_logits = tf.concat([self.fake_real_logits,
+                                          self.fake_caric_logits], 0)
+
+            self.pred = tf.argmax(self.logits, 1)
+            self.fake_pred = tf.argmax(self.fake_logits, 1)
+            self.correct_pred = tf.equal(self.pred,
+                                         self.labels)
+            self.correct_fake_pred = tf.equal(self.fake_pred,
+                                              self.labels)
+            self.accuracy = tf.reduce_mean(tf.cast(self.correct_pred,
+                                                   tf.float32))
+            self.fake_accuracy = tf.reduce_mean(tf.cast(
+                self.correct_fake_pred, tf.float32))
+
             # loss and train op
-            self.loss_reconst_real = tf.reduce_mean(tf.square(
-                self.real_images - self.reconst_real))
-            self.loss_reconst_caric = 0.0
+            self.loss_reconst_caric, self.loss_reconst_real = 0.0, 0.0
+            for reconst_real in self.reconst_reals:
+                self.loss_reconst_real += tf.reduce_mean(tf.square(
+                    self.real_images - reconst_real))
             for reconst_caric in self.reconst_carics:
                 self.loss_reconst_caric += tf.reduce_mean(tf.square(
                     self.caric_images - reconst_caric))
@@ -211,7 +231,9 @@ class DTN(object):
 
             self.loss_class = \
                 tf.losses.sparse_softmax_cross_entropy(self.labels,
-                                                       self.logits)
+                                                       self.logits) \
+                + tf.losses.sparse_softmax_cross_entropy(self.labels,
+                                                         self.fake_logits)
 
             self.loss = self.loss_class \
                 + self.loss_reconst * self.reconst_weight
@@ -233,19 +255,17 @@ class DTN(object):
                                              self.loss)
             accuracy_summary = tf.summary.scalar('accuracy',
                                                  self.accuracy)
+            fake_accuracy_summary = tf.summary.scalar('fake_accuracy',
+                                                      self.fake_accuracy)
 
-            reconst_real_summary = tf.summary.image('reconst_real_images',
-                                                    self.reconst_real)
-            reconst_caric_1 = tf.summary.image('reconst_caric_1',
-                                               self.reconst_carics[4])
+            reconst_real_2 = tf.summary.image('reconst_real_2',
+                                              self.reconst_reals[1])
+            reconst_real_5 = tf.summary.image('reconst_real_5',
+                                              self.reconst_reals[4])
             reconst_caric_2 = tf.summary.image('reconst_caric_2',
-                                               self.reconst_carics[3])
-            reconst_caric_3 = tf.summary.image('reconst_caric_3',
-                                               self.reconst_carics[2])
-            reconst_caric_4 = tf.summary.image('reconst_caric_4',
                                                self.reconst_carics[1])
             reconst_caric_5 = tf.summary.image('reconst_caric_5',
-                                               self.reconst_carics[0])
+                                               self.reconst_carics[4])
             caric_image_summary = tf.summary.image('caric_images',
                                                    self.caric_images)
             self.summary_op = tf.summary.merge([loss_summary,
@@ -253,14 +273,13 @@ class DTN(object):
                                                 loss_reconst_caric_summ,
                                                 loss_reconst_real_summ,
                                                 loss_class_summary,
-                                                reconst_caric_1,
                                                 reconst_caric_2,
-                                                reconst_caric_3,
-                                                reconst_caric_4,
                                                 reconst_caric_5,
-                                                reconst_real_summary,
+                                                reconst_real_2,
+                                                reconst_real_5,
                                                 caric_image_summary,
-                                                accuracy_summary])
+                                                accuracy_summary,
+                                                fake_accuracy_summary])
 
         elif self.mode == 'eval':
             self.images = tf.placeholder(tf.float32, [None, 64, 64, 3],
@@ -271,18 +290,26 @@ class DTN(object):
             self.sampled_images = self.generator(self.fx)
 
         elif self.mode == 'train':
-            self.src_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
-                                             'real_faces')
-            self.trg_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
-                                             'caricature_faces')
-            self.pos_ones = tf.placeholder(tf.float32, [None, 64, 64, 3],
-                                           'positive_pair_one')
-            self.pos_twos = tf.placeholder(tf.float32, [None, 64, 64, 3],
-                                           'positive_pair_two')
-            self.neg_ones = tf.placeholder(tf.float32, [None, 64, 64, 3],
-                                           'negative_pair_one')
-            self.neg_twos = tf.placeholder(tf.float32, [None, 64, 64, 3],
-                                           'negative_pair_two')
+            self.real_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
+                                              'real_faces')
+            self.caric_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
+                                               'caric_faces')
+            self.real_labels = tf.placeholder(tf.int64, [None],
+                                              'real_labels')
+            self.caric_labels = tf.placeholder(tf.int64, [None],
+                                               'caric_labels')
+            # self.src_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
+            #                                  'real_faces')
+            # self.trg_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
+            #                                  'caricature_faces')
+            # self.pos_ones = tf.placeholder(tf.float32, [None, 64, 64, 3],
+            #                                'positive_pair_one')
+            # self.pos_twos = tf.placeholder(tf.float32, [None, 64, 64, 3],
+            #                                'positive_pair_two')
+            # self.neg_ones = tf.placeholder(tf.float32, [None, 64, 64, 3],
+            #                                'negative_pair_one')
+            # self.neg_twos = tf.placeholder(tf.float32, [None, 64, 64, 3],
+            #                                'negative_pair_two')
 
             # features for labelled pairs
             self.f_pos1 = self.content_extractor(self.pos_ones)
