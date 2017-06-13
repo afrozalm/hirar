@@ -223,6 +223,10 @@ class DTN(object):
             # summary op
             loss_reconst_summary = tf.summary.scalar('reconstruction_loss',
                                                      self.loss_reconst)
+            loss_reconst_real_summ = tf.summary.scalar('reconstruction_real',
+                                                       self.loss_reconst_real)
+            loss_reconst_caric_summ = tf.summary.scalar('reconstruction_caric',
+                                                        self.loss_reconst_caric)
             loss_class_summary = tf.summary.scalar('classification_loss',
                                                    self.loss_class)
             loss_summary = tf.summary.scalar('combined loss',
@@ -230,22 +234,24 @@ class DTN(object):
             accuracy_summary = tf.summary.scalar('accuracy',
                                                  self.accuracy)
 
-            reconst_real_summary = tf.summary.image('reconst_images',
+            reconst_real_summary = tf.summary.image('reconst_real_images',
                                                     self.reconst_real)
             reconst_caric_1 = tf.summary.image('reconst_caric_1',
-                                               self.reconst_carics[0])
+                                               self.reconst_carics[4])
             reconst_caric_2 = tf.summary.image('reconst_caric_2',
-                                               self.reconst_carics[1])
+                                               self.reconst_carics[3])
             reconst_caric_3 = tf.summary.image('reconst_caric_3',
                                                self.reconst_carics[2])
             reconst_caric_4 = tf.summary.image('reconst_caric_4',
-                                               self.reconst_carics[3])
+                                               self.reconst_carics[1])
             reconst_caric_5 = tf.summary.image('reconst_caric_5',
-                                               self.reconst_carics[4])
+                                               self.reconst_carics[0])
             caric_image_summary = tf.summary.image('caric_images',
                                                    self.caric_images)
             self.summary_op = tf.summary.merge([loss_summary,
                                                 loss_reconst_summary,
+                                                loss_reconst_caric_summ,
+                                                loss_reconst_real_summ,
                                                 loss_class_summary,
                                                 reconst_caric_1,
                                                 reconst_caric_2,
