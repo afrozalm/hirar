@@ -160,6 +160,30 @@ class DTN(object):
                     net = slim.flatten(net)
                     return net
 
+    def transformer(self, features, layer=5, reuse=False):
+        assert layer in [1, 2, 3, 4, 5]
+        scope = 'transformer_layer_' + str(layer)
+        with tf.variable_scope(scope, reuse=reuse):
+            with slim.arg_scope([slim.conv2d], padding='SAME',
+                                activation_fn=None,
+                                stride=2,
+                                weights_initializer=tf.contrib.layers.xavier_initializer()):
+                with slim.arg_scope([slim.batch_norm], decay=0.95,
+                                    center=True, scale=True,
+                                    activation_fn=tf.nn.relu,
+                                    is_training=(self.mode == 'train')):
+
+                    # (batch, 1, 1, 512) -> (batch_size, 1, 1, 512)
+                    if layer == 5:
+                        net = slim.conv2d(features, 512, [1, 1],
+                                          activation_fn=tf.nn.relu,
+                                          scope='conv1')
+                        net = slim.batch_norm(net, scope='bn1')
+                        return net
+                    else:
+                        print 'Not Implemented for layer', layer
+                        exit()
+
     def build_model(self):
         if self.mode == 'pretrain':
             self.real_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
@@ -177,7 +201,6 @@ class DTN(object):
             self.caric_enc, self.caric_logits = self.encoder(self.caric_images,
                                                              scope_suffix='caric')
 
-            # self.images = tf.concat([self.real_images, self.caric_images], 0)
             self.reconst_carics, self.reconst_reals = [], []
             reuse = False
             for layer, feature in zip(xrange(5, 0, -1),
@@ -298,24 +321,35 @@ class DTN(object):
                                               'real_labels')
             self.caric_labels = tf.placeholder(tf.int64, [None],
                                                'caric_labels')
-            # self.src_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
-            #                                  'real_faces')
-            # self.trg_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
-            #                                  'caricature_faces')
-            # self.pos_ones = tf.placeholder(tf.float32, [None, 64, 64, 3],
-            #                                'positive_pair_one')
-            # self.pos_twos = tf.placeholder(tf.float32, [None, 64, 64, 3],
-            #                                'positive_pair_two')
-            # self.neg_ones = tf.placeholder(tf.float32, [None, 64, 64, 3],
-            #                                'negative_pair_one')
-            # self.neg_twos = tf.placeholder(tf.float32, [None, 64, 64, 3],
-            #                                'negative_pair_two')
 
-            # features for labelled pairs
-            self.f_pos1 = self.content_extractor(self.pos_ones)
-            self.f_pos2 = self.content_extractor(self.pos_twos, reuse=True)
-            self.f_neg1 = self.content_extractor(self.neg_ones, reuse=True)
-            self.f_neg2 = self.content_extractor(self.neg_twos, reuse=True)
+            # encodings, transformations and reconstructions
+            self.real_enc, self.real_logits = self.encoder(self.real_images,
+                                                           scope_suffix='real')
+            self.caric_enc, self.caric_logits = self.encoder(self.caric_images,
+                                                             scope_suffix='caric')
+            self.trans_real_feat = self.transformer(features=self.real_enc[-1],
+                                                    layer=5)
+            self.reconst = self.decoder(input=self.trans_real_feat,
+                                        layer=5, scope_suffix='caric')
+            _, self.reconst_logits = self.encoder(self.reconst,
+                                                  scope_suffix='caric')
+
+            self.pos_class = self.discriminator()
+            self.neg_class = self.discriminator()
+
+            # accuracy
+            self.pred = tf.argmax(self.reconst_logits, 1)
+            self.correct_pred = tf.equal(self.pred,
+                                         self.real_labels)
+
+            # classification_loss
+            self.loss_class = \
+                tf.sparse_softmax_cross_entropy(self.real_labels,
+                                                self.reconst_logits)
+            # adversarial_loss
+            self.loss_disc = tf.reduce_mean(self.pos_class
+                                            - self.neg_class)
+            self.loss_gen = - tf.reduce_mean(self.neg_class)
 
             # source domain
             self.fx = self.content_extractor(self.src_images, reuse=True)
