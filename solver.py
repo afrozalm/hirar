@@ -20,10 +20,8 @@ class Solver(object):
                  model_save_path='model',
                  pretrained_model='model/pre_model-4000',
                  test_model='model/dtn_ext-400',
-                 src_disc_rep=1,
-                 src_gen_rep=1,
-                 trg_disc_rep=1,
-                 trg_gen_rep=1):
+                 disc_rep=1,
+                 gen_rep=1):
 
         self.loader = DataLoader(batch_size)
         self.model = model
@@ -42,10 +40,8 @@ class Solver(object):
         self.test_model = test_model
         self.config = tf.ConfigProto()
         self.config.gpu_options.allow_growth = True
-        self.src_disc_rep = src_disc_rep
-        self.src_gen_rep = src_gen_rep
-        self.trg_disc_rep = trg_disc_rep
-        self.trg_gen_rep = trg_gen_rep
+        self.disc_rep = disc_rep
+        self.gen_rep = gen_rep
 
     def load_real(self, image_dir, split='train'):
         print ('loading real faces..')
@@ -222,109 +218,77 @@ class Solver(object):
                     print ('pre_model-%d saved..!' % (step + 1))
 
     def train(self):
-        # load faces
-        real_images, real_labels = self.load_real(self.real_dir,
-                                                  split='train')
-        caric_images, caric_labels = self.load_caric(self.caric_dir,
-                                                     split='train')
-        combined_images = self.load_combined()
-        label_set = set(np.hstack((real_labels, caric_labels)))
-
-        self.loader.add_dataset('real_images', real_images)
-        self.loader.add_dataset('caric_images', caric_images)
-        self.loader.add_dataset('real_labels', real_labels)
-        self.loader.add_dataset('caric_labels', caric_labels)
-
-        # build a graph
-        model = self.model
-        model.build_model()
-
         # make directory if not exists
         if tf.gfile.Exists(self.log_dir):
             tf.gfile.DeleteRecursively(self.log_dir)
         tf.gfile.MakeDirs(self.log_dir)
 
-        with tf.Session(config=self.config) as sess:
-            # initialize G and D
-            tf.global_variables_initializer().run()
-            # restore variables of F and G
-            print ('loading pretrained model F..')
-            f_variables_to_restore = \
-                slim.get_model_variables(scope='content_extractor')
-            f_restorer = tf.train.Saver(f_variables_to_restore)
-            f_restorer.restore(sess, self.pretrained_model)
+        # load faces
+        real_images, real_labels = self.load_real(self.real_dir,
+                                                  split='train')
+        caric_images, caric_labels = self.load_caric(self.caric_dir,
+                                                     split='train')
 
-            print ('loading pretrained model G..')
-            g_variables_to_restore = \
-                slim.get_model_variables(scope='generator')
-            g_restorer = tf.train.Saver(g_variables_to_restore)
-            g_restorer.restore(sess, self.pretrained_model)
+        self.loader.add_dataset('real_images', real_images)
+        self.loader.add_dataset('caric_images', caric_images)
+        self.loader.add_dataset('real_labels', real_labels)
+        self.loader.add_dataset('caric_labels', caric_labels)
+        self.loader.link_datasets('real', ['real_labels', 'real_images'])
+        self.loader.link_datasets('caric', ['caric_labels', 'caric_images'])
+
+        # build a graph
+        model = self.model
+        model.build_model()
+
+        with tf.Session(config=self.config) as sess:
+            # initialize
+            tf.global_variables_initializer().run()
+
+            # restore variables of F and G
+            pretrained_scopes = ['encoder_caric', 'encoder_real',
+                                 'decoder_caric']
+            print ('loading pretrained model ..')
+            for scope in pretrained_scopes:
+                variables_to_restore = \
+                    slim.get_model_variables(scope=scope)
+                restorer = tf.train.Saver(variables_to_restore)
+                restorer.restore(sess, self.pretrained_model)
 
             summary_writer = tf.summary.FileWriter(
                 logdir=self.log_dir, graph=tf.get_default_graph())
             saver = tf.train.Saver()
 
             print ('start training..!')
-            f_interval = 15
+
             for step in range(self.train_iter + 1):
 
-                i = step % int(real_images.shape[0] / self.batch_size)
-                src_images = self.loader.next_batch('real_images')
-                pos_ones, pos_twos = self.get_pairs(combined_images,
-                                                    label_set,
-                                                    set_type='positive')
-                neg_ones, neg_twos = self.get_pairs(combined_images,
-                                                    label_set,
-                                                    set_type='negative')
+                real_labels, real_images = \
+                    self.loader.next_group_batch('real')
+                caric_labels, caric_images = \
+                    self.loader.next_group_batch('caric')
 
-                feed_dict = {model.src_images: src_images,
-                             model.pos_ones: pos_ones,
-                             model.pos_twos: pos_twos,
-                             model.neg_ones: neg_ones,
-                             model.neg_twos: neg_twos}
+                feed_dict = {model.real_images: real_images,
+                             model.real_labels: real_labels,
+                             model.caric_labels: caric_labels,
+                             model.caric_images: caric_images}
 
-                for _ in xrange(self.src_disc_rep):
-                    sess.run(model.d_train_op_src, feed_dict)
-                for _ in xrange(self.src_gen_rep):
-                    sess.run([model.g_train_op_src], feed_dict)
-
-                if step > 1600:
-                    f_interval = 30
-
-                if i % f_interval == 0:
-                    sess.run(model.f_train_op_src, feed_dict)
+                for _ in xrange(self.disc_rep):
+                    sess.run(model.disc_op, feed_dict)
+                for _ in xrange(self.gen_rep):
+                    sess.run([model.trans_op, model.dec_op], feed_dict)
 
                 if (step + 1) % 10 == 0:
-                    summary, dl, gl, fl = sess.run([model.summary_op_src,
-                                                    model.d_loss_src,
-                                                    model.g_loss_src,
-                                                    model.f_loss_src],
-                                                   feed_dict)
+                    summary, discl, trl, decl, gl = \
+                        sess.run([model.summary_op,
+                                  model.loss_disc,
+                                  model.loss_transformer,
+                                  model.loss_decoder,
+                                  model.loss_gen],
+                                 feed_dict)
                     summary_writer.add_summary(summary, step)
-                    print ('[Source] step: [%d/%d] d_loss: [%.6f] g_loss: [%.6f] f_loss: [%.6f]'
-                           % (step + 1, self.train_iter, dl, gl, fl))
-
-                # train the model for target domain T
-                trg_images = self.loader.next_batch('caric_images')
-                feed_dict = {model.src_images: src_images,
-                             model.trg_images: trg_images,
-                             model.pos_ones: pos_ones,
-                             model.pos_twos: pos_twos,
-                             model.neg_ones: neg_ones,
-                             model.neg_twos: neg_twos}
-                for _ in xrange(self.trg_disc_rep):
-                    sess.run(model.d_train_op_trg, feed_dict)
-                for _ in xrange(self.trg_gen_rep):
-                    sess.run(model.g_train_op_trg, feed_dict)
-
-                if (step + 1) % 10 == 0:
-                    summary, dl, gl = sess.run([model.summary_op_trg,
-                                                model.d_loss_trg,
-                                                model.g_loss_trg],
-                                               feed_dict)
-                    summary_writer.add_summary(summary, step)
-                    print ('[Target] step: [%d/%d] d_loss: [%.6f] g_loss: [%.6f]'
-                           % (step + 1, self.train_iter, dl, gl))
+                    print ('[Source] step: [%d/%d] disc_loss: [%.6f] \
+trans_loss: [%.6f] dec_loss: [%.6f] gen_loss: [%.6f]'
+                           % (step + 1, self.train_iter, discl, trl, decl, gl))
 
                 if (step + 1) % 200 == 0:
                     saver.save(sess, os.path.join(
@@ -335,8 +299,8 @@ class Solver(object):
                     for i in range(self.sample_iter):
                         # train model for source domain S
                         batch_images = self.loader.next_batch('real_images')
-                        feed_dict = {model.images: batch_images}
-                        sampled_batch_images = sess.run(model.sampled_images,
+                        feed_dict = {model.real_images: batch_images}
+                        sampled_batch_images = sess.run(model.trans_reconst,
                                                         feed_dict)
 
                         # merge and save source images and sampled target image
