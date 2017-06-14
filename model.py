@@ -383,8 +383,8 @@ class Hirar(object):
                 + tf.losses.sparse_softmax_cross_entropy(self.real_labels,
                                                          self.real_logits)
             # adversarial_loss
-            self.loss_disc = tf.reduce_mean(self.pos_class
-                                            - self.neg_class)
+            self.loss_disc = - tf.reduce_mean(self.pos_class
+                                              - self.neg_class)
             self.loss_gen = - tf.reduce_mean(self.neg_class)
 
             # transformer_loss
