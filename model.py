@@ -67,16 +67,14 @@ class DTN(object):
                     lr5 = slim.batch_norm(net, activation_fn=tf.nn.tanh,
                                           scope='bn5')
                     features.append(lr5)
-                    if self.mode == 'pretrain':
-                        # (batch_size, 1, 1, n_classes)
-                        logits = slim.conv2d(lr5, n_classes, [1, 1],
-                                             padding='VALID',
-                                             scope='out')
-                        # (batch_size, n_classes)
-                        logits = slim.flatten(logits)
-                        return features, logits
 
-                    return features
+                    # (batch_size, 1, 1, n_classes)
+                    logits = slim.conv2d(lr5, n_classes, [1, 1],
+                                         padding='VALID',
+                                         scope='out')
+                    # (batch_size, n_classes)
+                    logits = slim.flatten(logits)
+                    return features, logits
 
     def decoder(self, inputs, reuse=False,
                 layer=5, scope_suffix='caric'):
@@ -120,13 +118,11 @@ class DTN(object):
                                                 scope='conv_transpose5')
                     return net
 
-    def discriminator(self, images, reuse=False,
-                      layer=1, scope='discriminator'):
-        assert scope in ['classifier', 'discriminator']
+    def discriminator(self, features, layer=5, reuse=False):
         # images: (batch, 64, 64, 3)
-        net = images
-        assert layer in [1, 2, 3, 4, 5]
-        with tf.variable_scope(scope, reuse=reuse):
+        net = features
+        assert layer in [0, 1, 2, 3, 4, 5]
+        with tf.variable_scope('discriminator', reuse=reuse):
             with slim.arg_scope([slim.conv2d], padding='SAME',
                                 activation_fn=None,
                                 stride=2,
@@ -137,27 +133,33 @@ class DTN(object):
                                     is_training=(self.mode == 'train')):
 
                     # (batch, 64, 64, 3) -> (batch_size, 32, 32, 64)
-                    if layer == 1:
-                        net = slim.conv2d(images, 64, [3, 3],
+                    if layer == 0:
+                        net = slim.conv2d(net, 64, [3, 3],
                                           activation_fn=tf.nn.relu,
                                           scope='conv1')
                         net = slim.batch_norm(net, scope='bn1')
                     # (batch_size, 32, 32, 64) -> (batch_size, 16, 16, 128)
-                    if layer <= 2:
+                    if layer <= 1:
                         net = slim.conv2d(net, 128, [3, 3], scope='conv2')
                         net = slim.batch_norm(net, scope='bn2')
                     # (batch_size, 16, 16, 128) -> (batch_size, 8, 8, 256)
-                    if layer <= 3:
+                    if layer <= 2:
                         net = slim.conv2d(net, 256, [3, 3], scope='conv3')
                         net = slim.batch_norm(net, scope='bn3')
                     # (batch_size, 8, 8, 256) -> (batch_size, 4, 4, 512)
-                    if layer <= 4:
+                    if layer <= 3:
                         net = slim.conv2d(net, 512, [3, 3], scope='conv4')
                         net = slim.batch_norm(net, scope='bn4')
-                    # (batch_size, 4, 4, 512) -> (batch_size, 1, 1, 1)
-                    net = slim.conv2d(net, 1, [4, 4], padding='VALID',
-                                      scope='conv5')
+                    # (batch_size, 4, 4, 512) -> (batch_size, 1, 1, 512)
+                    if layer <= 4:
+                        net = slim.conv2d(net, 512, [4, 4], padding='VALID',
+                                          scope='conv5')
+                        net = slim.batch_norm(net, scope='bn5')
                     net = slim.flatten(net)
+                    # (batch_size, 512) -> #(batch_size, 50)
+                    net = slim.fully_connected(net, 50, scope='fc6')
+                    # (batch_size, 50) -> #(batch_size, )
+                    net = slim.fully_connected(net, 1, scope='fc7')
                     return net
 
     def transformer(self, features, layer=5, reuse=False):
@@ -325,168 +327,106 @@ class DTN(object):
             # encodings, transformations and reconstructions
             self.real_enc, self.real_logits = self.encoder(self.real_images,
                                                            scope_suffix='real')
-            self.caric_enc, self.caric_logits = self.encoder(self.caric_images,
-                                                             scope_suffix='caric')
+            self.caric_enc, _ = self.encoder(self.caric_images,
+                                             scope_suffix='caric')
+
+            self.reconst_caric = self.decoder(inputs=self.caric_enc[-1],
+                                              layer=5, scope_suffix='caric')
             self.trans_real_feat = self.transformer(features=self.real_enc[-1],
                                                     layer=5)
-            self.reconst = self.decoder(input=self.trans_real_feat,
-                                        layer=5, scope_suffix='caric')
-            _, self.reconst_logits = self.encoder(self.reconst,
-                                                  scope_suffix='caric')
+            self.trans_reconst = self.decoder(inputs=self.trans_real_feat,
+                                              reuse=True, layer=5,
+                                              scope_suffix='caric')
+            _, self.reconst_logits = self.encoder(self.trans_reconst,
+                                                  scope_suffix='caric',
+                                                  reuse=True)
 
-            self.pos_class = self.discriminator()
-            self.neg_class = self.discriminator()
+            # discriminator scores
+            self.pos_class = self.discriminator(features=self.caric_enc[-1],
+                                                layer=5)
+            self.neg_class = self.discriminator(features=self.trans_real_feat,
+                                                layer=5, reuse=True)
 
             # accuracy
             self.pred = tf.argmax(self.reconst_logits, 1)
             self.correct_pred = tf.equal(self.pred,
                                          self.real_labels)
+            self.trans_accr = tf.reduce_mean(tf.cast(
+                self.correct_pred, tf.float32))
+
+            # loss_decoder
+            self.loss_decoder = tf.reduce_mean(tf.losses.absolute_difference(
+                self.reconst_caric, self.caric_images))
 
             # classification_loss
             self.loss_class = \
-                tf.sparse_softmax_cross_entropy(self.real_labels,
-                                                self.reconst_logits)
+                tf.losses.sparse_softmax_cross_entropy(self.real_labels,
+                                                       self.reconst_logits) \
+                + tf.losses.sparse_softmax_cross_entropy(self.real_labels,
+                                                         self.real_logits)
             # adversarial_loss
             self.loss_disc = tf.reduce_mean(self.pos_class
                                             - self.neg_class)
             self.loss_gen = - tf.reduce_mean(self.neg_class)
 
-            # source domain
-            self.fx = self.content_extractor(self.src_images, reuse=True)
-            self.fake_images = self.generator(self.fx)
-            self.logits = self.discriminator(self.fake_images)
-            self.fgfx = self.content_extractor(self.fake_images, reuse=True)
-            ones = tf.ones_like(self.logits)
-            class_one = tf.multiply(ones, tf.constant([1, 0, 0],
-                                                      dtype=tf.float32))
-            class_two = tf.multiply(ones, tf.constant([0, 1, 0],
-                                                      dtype=tf.float32))
-            class_three = tf.multiply(ones, tf.constant([0, 0, 1],
-                                                        dtype=tf.float32))
-
-            # ucn loss
-            self.loss_ucn_pos = tf.reduce_mean(
-                tf.square(self.f_pos1 - self.f_pos2))
-            neg_diff = tf.square(self.f_neg1 - self.f_neg2)
-            self.loss_ucn_neg = tf.reduce_mean(
-                tf.maximum(0., self.margin - neg_diff))
-            self.loss_ucn = \
-                self.loss_ucn_pos * self.pos_weight + self.loss_ucn_neg
-
-            # dtn loss src
-            self.d_loss_src = tf.losses.softmax_cross_entropy(
-                class_one, self.logits)            # L_D D1
-            self.g_loss_src = tf.losses.softmax_cross_entropy(
-                class_three, self.logits)          # L_GANG D3
-            self.f_loss_src = self.f_weight * (
-                tf.reduce_mean(tf.square(self.fx - self.fgfx))
-                + self.loss_ucn * self.ucn_weight)
+            # transformer_loss
+            self.loss_transformer = self.loss_gen + self.loss_class
 
             # optimizer
-            self.d_optimizer_src = tf.train.AdamOptimizer(self.learning_rate)
-            self.g_optimizer_src = tf.train.AdamOptimizer(self.learning_rate)
-            self.f_optimizer_src = tf.train.AdamOptimizer(self.learning_rate)
+            self.dec_opt = tf.train.RMSPropOptimizer(self.learning_rate)
+            self.disc_opt = tf.train.RMSPropOptimizer(self.learning_rate)
+            self.trans_opt = tf.train.RMSPropOptimizer(self.learning_rate)
 
-            t_vars = tf.trainable_variables()
-            d_vars = [var for var in t_vars if 'discriminator' in var.name]
-            g_vars = [var for var in t_vars if 'generator' in var.name]
-            f_vars = [var for var in t_vars if 'content_extractor' in var.name]
-
-            # train op
-            with tf.variable_scope('source_train_op', reuse=False):
-                self.d_train_op_src = slim.learning.create_train_op(
-                    self.d_loss_src,
-                    self.d_optimizer_src,
-                    variables_to_train=d_vars)
-                self.g_train_op_src = slim.learning.create_train_op(
-                    self.g_loss_src,
-                    self.g_optimizer_src,
-                    variables_to_train=g_vars)
-                self.f_train_op_src = slim.learning.create_train_op(
-                    self.f_loss_src,
-                    self.f_optimizer_src,
-                    variables_to_train=f_vars)
-
-            # summary op
-            d_loss_src_summary = tf.summary.scalar('src_d_loss',
-                                                   self.d_loss_src)
-            g_loss_src_summary = tf.summary.scalar('src_g_loss',
-                                                   self.g_loss_src)
-            f_loss_src_summary = tf.summary.scalar('src_f_loss',
-                                                   self.f_loss_src)
-            origin_images_summary = tf.summary.image('src_origin_images',
-                                                     self.src_images)
-            sampled_images_summary = tf.summary.image('src_sampled_images',
-                                                      self.fake_images)
-            loss_ucn_summary = tf.summary.scalar('ucn loss',
-                                                 self.loss_ucn)
-            loss_ucn_pos_summary = tf.summary.scalar('ucn pos loss',
-                                                     self.loss_ucn_pos)
-            loss_ucn_neg_summary = tf.summary.scalar('ucn neg loss',
-                                                     self.loss_ucn_neg)
-            self.summary_op_src = tf.summary.merge([d_loss_src_summary,
-                                                    g_loss_src_summary,
-                                                    f_loss_src_summary,
-                                                    loss_ucn_summary,
-                                                    loss_ucn_pos_summary,
-                                                    loss_ucn_neg_summary,
-                                                    origin_images_summary,
-                                                    sampled_images_summary])
-
-            # target domain
-            self.fx = self.content_extractor(self.trg_images, reuse=True)
-            self.reconst_images = self.generator(self.fx, reuse=True)
-            self.logits_fake = self.discriminator(self.reconst_images, reuse=True)
-            self.logits_real = self.discriminator(self.trg_images, reuse=True)
-
-            # loss
-            self.d_loss_fake_trg = tf.losses.softmax_cross_entropy(
-                class_two, self.logits_fake)      # L_D D2
-            self.d_loss_real_trg = tf.losses.softmax_cross_entropy(
-                class_three, self.logits_real)    # L_D D3
-            self.d_loss_trg = self.d_loss_fake_trg + self.d_loss_real_trg
-            self.g_loss_fake_trg = tf.losses.softmax_cross_entropy(
-                class_three, self.logits_fake)  # L_GANG D3
-            self.g_loss_const_trg = tf.reduce_mean(tf.square(
-                self.trg_images - self.reconst_images))  # L_TID
-            self.g_loss_trg = self.g_loss_fake_trg \
-                + self.g_loss_const_trg * self.reconst_weight
-
-            # optimizer
-            self.d_optimizer_trg = tf.train.AdamOptimizer(self.learning_rate)
-            self.g_optimizer_trg = tf.train.AdamOptimizer(self.learning_rate)
+            # model variables
+            all_vars = tf.trainable_variables()
+            disc_vars = \
+                [var for var in all_vars if 'discriminator' in var.name]
+            trans_vars = \
+                [var for var in all_vars if 'transformer' in var.name]
+            dec_vars = \
+                [var for var in all_vars if 'decoder_caric' in var.name]
 
             # train op
-            with tf.variable_scope('target_train_op', reuse=False):
-                self.d_train_op_trg = slim.learning.create_train_op(
-                    self.d_loss_trg, self.d_optimizer_trg, variables_to_train=d_vars)
-                self.g_train_op_trg = slim.learning.create_train_op(
-                    self.g_loss_trg, self.g_optimizer_trg, variables_to_train=g_vars)
+            with tf.variable_scope('train_op', reuse=False):
+                self.disc_op = slim.learning.create_train_op(
+                    self.loss_disc,
+                    self.disc_opt,
+                    variables_to_train=disc_vars,
+                    clip_gradient_norm=0.01)
+                self.trans_op = slim.learning.create_train_op(
+                    self.loss_transformer,
+                    self.trans_opt,
+                    variables_to_train=trans_vars)
+                self.dec_op = slim.learning.create_train_op(
+                    self.loss_decoder,
+                    self.dec_opt,
+                    variables_to_train=dec_vars)
 
             # summary op
-            d_loss_fake_trg_summary = tf.summary.scalar(
-                'trg_d_loss_fake', self.d_loss_fake_trg)
-            d_loss_real_trg_summary = tf.summary.scalar(
-                'trg_d_loss_real', self.d_loss_real_trg)
-            d_loss_trg_summary = tf.summary.scalar('trg_d_loss',
-                                                   self.d_loss_trg)
-            g_loss_fake_trg_summary = tf.summary.scalar(
-                'trg_g_loss_fake', self.g_loss_fake_trg)
-            g_loss_const_trg_summary = tf.summary.scalar(
-                'reconstruction_loss', self.g_loss_const_trg)
-            g_loss_trg_summary = tf.summary.scalar('trg_g_loss',
-                                                   self.g_loss_trg)
-            origin_images_summary = tf.summary.image('trg_origin_images',
-                                                     self.trg_images)
-            sampled_images_summary = tf.summary.image(
-                'trg_reconstructed_images', self.reconst_images)
-            self.summary_op_trg = tf.summary.merge([d_loss_trg_summary,
-                                                    g_loss_trg_summary,
-                                                    d_loss_fake_trg_summary,
-                                                    d_loss_real_trg_summary,
-                                                    g_loss_fake_trg_summary,
-                                                    g_loss_const_trg_summary,
-                                                    origin_images_summary,
-                                                    sampled_images_summary])
-            for var in tf.trainable_variables():
-                tf.summary.histogram(var.op.name, var)
+            gen_loss_summary = tf.summary.scalar('gen_loss',
+                                                 self.loss_gen)
+            dec_loss_summary = tf.summary.scalar('loss_dec',
+                                                 self.loss_decoder)
+            accuracy_summary = tf.summary.scalar('trans_accr',
+                                                 self.trans_accr)
+            disc_loss_summary = tf.summary.scalar('disc_loss',
+                                                  self.loss_disc)
+            trans_loss_summary = tf.summary.scalar('transformer_loss',
+                                                   self.loss_transformer)
+            real_images_summary = tf.summary.image('real_images',
+                                                   self.real_images)
+            caric_images_summary = tf.summary.image('caric_images',
+                                                    self.caric_images)
+            trans_reconst_summary = tf.summary.image('trans_reconst',
+                                                     self.trans_reconst)
+            caric_reconst_summary = tf.summary.image('caric_reconst',
+                                                     self.reconst_caric)
+            self.summary_op = tf.summary.merge([gen_loss_summary,
+                                                dec_loss_summary,
+                                                accuracy_summary,
+                                                disc_loss_summary,
+                                                trans_loss_summary,
+                                                real_images_summary,
+                                                caric_images_summary,
+                                                trans_reconst_summary,
+                                                caric_reconst_summary])
