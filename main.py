@@ -1,23 +1,20 @@
 import tensorflow as tf
-from model import DTN
+from model import Hirar
 from solver import Solver
 
 flags = tf.app.flags
 flags.DEFINE_string('mode', 'train', "'pretrain', 'train' or 'eval'")
-flags.DEFINE_float('margin', 512.0, "margin for negative class")
-flags.DEFINE_float('pos_weight', 1.0, "weight to ucn pos loss")
-flags.DEFINE_float('ucn_weight', 5.0, "weight to ucn loss")
-flags.DEFINE_float('f_weight', 3.0, "weight to dtn's f-constancy")
 flags.DEFINE_integer('n_classes', 200, "number of classes")
 flags.DEFINE_integer('batch_size', 25, "set the value of batch_size")
-flags.DEFINE_float('reconst_weight', 15.0, "weight for reconstruction loss")
+flags.DEFINE_integer('feat_layer', 5, "encoder layer to be transformed")
+flags.DEFINE_float('class_weight', 1.0, "weight to classification loss")
 flags.DEFINE_float('learning_rate', 1e-4, "learning rate for Adam")
 flags.DEFINE_integer('pretrain_iter', 20000, "iterations to pretrain model")
 flags.DEFINE_integer('train_iter', 20000, "iterations to train model")
 flags.DEFINE_integer('sample_iter', 100, "iterations to get images")
 flags.DEFINE_string('pretrained_model', '',
                     "location of pretrained model")
-flags.DEFINE_string('test_model', 'model/dtn-400', "location for test model")
+flags.DEFINE_string('test_model', 'model/hirar-400', "location for test model")
 flags.DEFINE_string('model_save_path', 'model',
                     "directory for saving the model")
 flags.DEFINE_string('sample_save_path', 'sample',
@@ -29,14 +26,11 @@ FLAGS = flags.FLAGS
 
 def main(_):
 
-    model = DTN(mode=FLAGS.mode,
-                learning_rate=FLAGS.learning_rate,
-                n_classes=FLAGS.n_classes,
-                margin=FLAGS.margin,
-                ucn_weight=FLAGS.ucn_weight,
-                pos_weight=FLAGS.pos_weight,
-                f_weight=FLAGS.f_weight,
-                reconst_weight=FLAGS.reconst_weight)
+    model = Hirar(mode=FLAGS.mode,
+                  learning_rate=FLAGS.learning_rate,
+                  n_classes=FLAGS.n_classes,
+                  class_weight=FLAGS.class_weight,
+                  feat_layer=FLAGS.feat_layer)
 
     solver = Solver(model, batch_size=FLAGS.batch_size,
                     pretrain_iter=FLAGS.pretrain_iter,

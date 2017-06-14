@@ -6,7 +6,6 @@ import os
 import scipy.io
 import scipy.misc
 from data_loader import DataLoader
-from random import sample
 
 
 class Solver(object):
@@ -19,7 +18,7 @@ class Solver(object):
                  sample_save_path='sample',
                  model_save_path='model',
                  pretrained_model='model/pre_model-4000',
-                 test_model='model/dtn_ext-400',
+                 test_model='model/hirar-400',
                  disc_rep=1,
                  gen_rep=1):
 
@@ -67,18 +66,6 @@ class Solver(object):
         print ('finished loading caricature faces..!')
         return images, labels
 
-    def load_combined(self):
-        print('loading combined images ...')
-        with open(self.combined_dir, 'rb') as f:
-            combined_imgs = pickle.load(f)
-        for lbl in combined_imgs:
-            mean_r = np.mean(combined_imgs[lbl]['real'])
-            mean_c = np.mean(combined_imgs[lbl]['caric'])
-            combined_imgs[lbl]['real'] = combined_imgs[lbl]['real'] / mean_r - 1
-            combined_imgs[lbl]['caric'] = combined_imgs[lbl]['caric'] / mean_c - 1
-        print('finished loading combined_imgs')
-        return combined_imgs
-
     def merge_images(self, sources, targets, k=10):
         _, h, w, _ = sources.shape
         row = int(np.sqrt(self.batch_size))
@@ -90,49 +77,6 @@ class Solver(object):
             merged[i * h:(i + 1) * h, (j * 2) * h:(j * 2 + 1) * h, :] = s
             merged[i * h:(i + 1) * h, (j * 2 + 1) * h:(j * 2 + 2) * h, :] = t
         return merged
-
-    def get_pairs(self, combined_images, label_set, set_type='positive'):
-        def get_pos_pair(label):
-            toss = np.random.uniform()
-            if toss < 0.5:
-                real_img = sample(combined_images[label]['real'], 1)[0]
-                caric_img = sample(combined_images[label]['caric'], 1)[0]
-                return [real_img, caric_img]
-            elif toss > 0.75:
-                try:
-                    return sample(combined_images[label]['caric'], 2)
-                except:
-                    return sample(combined_images[label]['real'], 2)
-            else:
-                try:
-                    return sample(combined_images[label]['real'], 2)
-                except:
-                    real_img = sample(combined_images[label]['real'], 1)[0]
-                    caric_img = sample(combined_images[label]['caric'], 1)[0]
-                    return [real_img, caric_img]
-
-        def get_neg_pair(label):
-            toss = np.random.uniform()
-            neg_lbl = sample(label_set - set([label]), 1)[0]
-            if toss < 0.5:
-                neg_img = sample(combined_images[neg_lbl]['real'], 1)[0]
-                img = sample(combined_images[label]['caric'], 1)[0]
-            elif toss > 0.75:
-                neg_img = sample(combined_images[neg_lbl]['caric'], 1)[0]
-                img = sample(combined_images[label]['caric'], 1)[0]
-            else:
-                neg_img = sample(combined_images[neg_lbl]['caric'], 1)[0]
-                img = sample(combined_images[label]['caric'], 1)[0]
-            return [img, neg_img]
-
-        # some labels for positive pairs
-        perm = sample(label_set, self.batch_size)
-        if set_type == 'positive':
-            pos_ones, pos_twos = zip(*map(get_pos_pair, perm))
-            return np.asarray(pos_ones), np.asarray(pos_twos)
-        else:
-            neg_ones, neg_twos = zip(*map(get_neg_pair, perm))
-            return np.asarray(neg_ones), np.asarray(neg_twos)
 
     def pretrain(self):
 
@@ -292,8 +236,8 @@ trans_loss: [%.6f] dec_loss: [%.6f] gen_loss: [%.6f]'
 
                 if (step + 1) % 200 == 0:
                     saver.save(sess, os.path.join(
-                        self.model_save_path, 'dtn_ext'), global_step=step + 1)
-                    print ('model/dtn_ext-%d saved' % (step + 1))
+                        self.model_save_path, 'hirar'), global_step=step + 1)
+                    print ('model/hirar-%d saved' % (step + 1))
 
                 if (step + 1) % 1000 == 0:
                     for i in range(self.sample_iter):

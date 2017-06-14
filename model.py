@@ -1,21 +1,18 @@
-
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
 
-class DTN(object):
+class Hirar(object):
     '''
     Domain Transfer Network
     '''
 
     def __init__(self, mode='train', learning_rate=0.0003,
-                 n_classes=10, reconst_weight=15.0,
-                 class_weight=1.0, feat_layer=5):
+                 n_classes=10, class_weight=1.0, feat_layer=5):
 
         self.mode = mode
         self.learning_rate = learning_rate
         self.n_classes = n_classes
-        self.reconst_weight = reconst_weight
         self.class_weight = class_weight
         self.feat_layer = feat_layer
 
@@ -258,8 +255,8 @@ class DTN(object):
                 + tf.losses.sparse_softmax_cross_entropy(self.labels,
                                                          self.fake_logits)
 
-            self.loss = self.loss_class \
-                + self.loss_reconst * self.reconst_weight
+            self.loss = self.loss_class * self.class_weight \
+                + self.loss_reconst
             self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
             self.train_op = slim.learning.create_train_op(self.loss,
                                                           self.optimizer,
@@ -331,9 +328,9 @@ class DTN(object):
             self.reconst_caric = self.decoder(inputs=self.caric_enc[self.feat_layer - 1],
                                               layer=self.feat_layer,
                                               scope_suffix='caric')
-            trans_real_feat = self.transformer(features=self.real_enc[self.feat_layer - 1],
-                                               layer=self.feat_layer)
-            self.trans_reconst = self.decoder(inputs=trans_real_feat,
+            self.trans_real_feat = self.transformer(features=self.real_enc[self.feat_layer - 1],
+                                                    layer=self.feat_layer)
+            self.trans_reconst = self.decoder(inputs=self.trans_real_feat,
                                               reuse=True,
                                               layer=self.feat_layer,
                                               scope_suffix='caric')
