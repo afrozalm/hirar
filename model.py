@@ -7,10 +7,12 @@ class Hirar(object):
     Hierarchical Features for caricature geneation
     '''
 
-    def __init__(self, mode='train', learning_rate=0.0003, skip=True,
-                 n_classes=10, class_weight=1.0, feat_layer=5):
+    def __init__(self, mode='train', learning_rate=0.0003,
+                 n_classes=10, class_weight=1.0, feat_layer=5,
+                 skip=True, skip_layers=2):
 
         self.mode = mode
+        self.skip_layers = skip_layers
         self.skip = skip
         self.learning_rate = learning_rate
         self.n_classes = n_classes
@@ -179,23 +181,21 @@ class Hirar(object):
                                     activation_fn=tf.nn.relu,
                                     is_training=(self.mode == 'train')):
 
-                    # (batch, 1, 1, 512) -> (batch_size, 1, 1, 512)
                     if layer == 5:
                         net = slim.conv2d(features, 512, [1, 1],
                                           scope='conv1')
                         net = slim.batch_norm(net, scope='bn1')
-
-                        net = slim.conv2d(net, 512, [1, 1], scope='conv2')
-                        net = slim.batch_norm(net, scope='bn2')
-
                     else:
                         depth = self.depth_dict[layer]
                         net = slim.conv2d(features, depth, [3, 3],
                                           scope='conv1')
                         net = slim.batch_norm(net, scope='bn1')
 
-                        net = slim.conv2d(net, depth, [3, 3], scope='conv2')
-                        net = slim.batch_norm(net, scope='bn2')
+                    for i in xrange(self.skip_layers - 1):
+                        net = slim.conv2d(net, 512, [1, 1],
+                                scope='conv%d' % (i + 2))
+                        net = slim.batch_norm(net,
+                                scope='bn%d' % (i + 2))
 
                     if self.skip:
                         return features + net

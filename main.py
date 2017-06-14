@@ -7,6 +7,7 @@ flags.DEFINE_string('mode', 'train', "'pretrain', 'train' or 'eval'")
 flags.DEFINE_integer('n_classes', 200, "number of classes")
 flags.DEFINE_integer('batch_size', 25, "set the value of batch_size")
 flags.DEFINE_integer('feat_layer', 5, "encoder layer to be transformed")
+flags.DEFINE_integer('skip_layers', 3, "number of skip connections in transformer")
 flags.DEFINE_boolean('skip', False, "to keep skip connection in transformer")
 flags.DEFINE_float('class_weight', 1.0, "weight to classification loss")
 flags.DEFINE_float('learning_rate', 1e-4, "learning rate for Adam")
@@ -32,6 +33,7 @@ def main(_):
                   n_classes=FLAGS.n_classes,
                   class_weight=FLAGS.class_weight,
                   skip=FLAGS.skip,
+                  skip_layers=FLAGS.skip_layers,
                   feat_layer=FLAGS.feat_layer)
 
     solver = Solver(model, batch_size=FLAGS.batch_size,
