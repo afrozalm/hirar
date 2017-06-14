@@ -22,10 +22,8 @@ flags.DEFINE_string('model_save_path', 'model',
                     "directory for saving the model")
 flags.DEFINE_string('sample_save_path', 'sample',
                     "directory for saving the sampled images")
-flags.DEFINE_integer('src_disc_rep', 3, "disc repeats for source part")
-flags.DEFINE_integer('src_gen_rep', 1, "gen repeats for source part")
-flags.DEFINE_integer('trg_disc_rep', 3, "disc repeats for target part")
-flags.DEFINE_integer('trg_gen_rep', 1, "disc repeats for target part")
+flags.DEFINE_integer('disc_rep', 3, "disc repeats for source part")
+flags.DEFINE_integer('gen_rep', 1, "gen repeats for source part")
 FLAGS = flags.FLAGS
 
 
@@ -49,10 +47,8 @@ def main(_):
                     sample_save_path=FLAGS.sample_save_path,
                     pretrained_model=FLAGS.pretrained_model,
                     test_model=FLAGS.test_model,
-                    src_disc_rep=FLAGS.src_disc_rep,
-                    src_gen_rep=FLAGS.src_gen_rep,
-                    trg_disc_rep=FLAGS.trg_disc_rep,
-                    trg_gen_rep=FLAGS.trg_gen_rep)
+                    disc_rep=FLAGS.disc_rep,
+                    gen_rep=FLAGS.gen_rep)
 
     # create directories if not exist
     if not tf.gfile.Exists(FLAGS.model_save_path):
