@@ -9,17 +9,15 @@ class DTN(object):
     '''
 
     def __init__(self, mode='train', learning_rate=0.0003,
-                 n_classes=10, margin=2048.0, ucn_weight=5.0,
-                 f_weight=3.0, reconst_weight=15.0, pos_weight=1.0):
+                 n_classes=10, reconst_weight=15.0,
+                 class_weight=1.0, feat_layer=5):
 
         self.mode = mode
-        self.pos_weight = pos_weight
         self.learning_rate = learning_rate
         self.n_classes = n_classes
-        self.margin = margin
-        self.ucn_weight = ucn_weight
-        self.f_weight = f_weight
         self.reconst_weight = reconst_weight
+        self.class_weight = class_weight
+        self.feat_layer = feat_layer
 
     def encoder(self, images, reuse=False, scope_suffix='caric'):
         n_classes = self.n_classes
@@ -330,22 +328,25 @@ class DTN(object):
             self.caric_enc, _ = self.encoder(self.caric_images,
                                              scope_suffix='caric')
 
-            self.reconst_caric = self.decoder(inputs=self.caric_enc[-1],
-                                              layer=5, scope_suffix='caric')
-            self.trans_real_feat = self.transformer(features=self.real_enc[-1],
-                                                    layer=5)
-            self.trans_reconst = self.decoder(inputs=self.trans_real_feat,
-                                              reuse=True, layer=5,
+            self.reconst_caric = self.decoder(inputs=self.caric_enc[self.feat_layer - 1],
+                                              layer=self.feat_layer,
+                                              scope_suffix='caric')
+            trans_real_feat = self.transformer(features=self.real_enc[self.feat_layer - 1],
+                                               layer=self.feat_layer)
+            self.trans_reconst = self.decoder(inputs=trans_real_feat,
+                                              reuse=True,
+                                              layer=self.feat_layer,
                                               scope_suffix='caric')
             _, self.reconst_logits = self.encoder(self.trans_reconst,
                                                   scope_suffix='caric',
                                                   reuse=True)
 
             # discriminator scores
-            self.pos_class = self.discriminator(features=self.caric_enc[-1],
-                                                layer=5)
+            self.pos_class = self.discriminator(features=self.caric_enc[self.feat_layer - 1],
+                                                layer=self.feat_layer)
             self.neg_class = self.discriminator(features=self.trans_real_feat,
-                                                layer=5, reuse=True)
+                                                layer=self.feat_layer,
+                                                reuse=True)
 
             # accuracy
             self.pred = tf.argmax(self.reconst_logits, 1)
@@ -370,7 +371,8 @@ class DTN(object):
             self.loss_gen = - tf.reduce_mean(self.neg_class)
 
             # transformer_loss
-            self.loss_transformer = self.loss_gen + self.loss_class
+            self.loss_transformer = self.loss_gen \
+                + self.loss_class * self.class_weight
 
             # optimizer
             self.dec_opt = tf.train.RMSPropOptimizer(self.learning_rate)
