@@ -239,7 +239,7 @@ trans_loss: [%.6f] dec_loss: [%.6f] gen_loss: [%.6f]'
                         self.model_save_path, 'hirar'), global_step=step + 1)
                     print ('model/hirar-%d saved' % (step + 1))
 
-                if (step + 1) % 1000 == 0:
+                if (step + 1) % 5000 == 0:
                     for i in range(self.sample_iter):
                         # train model for source domain S
                         batch_images = self.loader.next_batch('real_images')
