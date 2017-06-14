@@ -7,10 +7,11 @@ class Hirar(object):
     Hierarchical Features for caricature geneation
     '''
 
-    def __init__(self, mode='train', learning_rate=0.0003,
+    def __init__(self, mode='train', learning_rate=0.0003, skip=True,
                  n_classes=10, class_weight=1.0, feat_layer=5):
 
         self.mode = mode
+        self.skip = skip
         self.learning_rate = learning_rate
         self.n_classes = n_classes
         self.class_weight = class_weight
@@ -187,8 +188,6 @@ class Hirar(object):
                         net = slim.conv2d(net, 512, [1, 1], scope='conv2')
                         net = slim.batch_norm(net, scope='bn2')
 
-                        return features + net
-
                     else:
                         depth = self.depth_dict[layer]
                         net = slim.conv2d(features, depth, [3, 3],
@@ -198,7 +197,11 @@ class Hirar(object):
                         net = slim.conv2d(net, depth, [3, 3], scope='conv2')
                         net = slim.batch_norm(net, scope='bn2')
 
+                    if self.skip:
                         return features + net
+                    else:
+                        return net
+
 
     def build_model(self):
 
