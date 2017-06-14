@@ -4,7 +4,7 @@ import tensorflow.contrib.slim as slim
 
 class Hirar(object):
     '''
-    Domain Transfer Network
+    Hierarchical Features for caricature geneation
     '''
 
     def __init__(self, mode='train', learning_rate=0.0003,
@@ -15,8 +15,14 @@ class Hirar(object):
         self.n_classes = n_classes
         self.class_weight = class_weight
         self.feat_layer = feat_layer
+        self.depth_dict = {1: 64,
+                           2: 128,
+                           3: 256,
+                           4: 512,
+                           5: 512}
 
     def encoder(self, images, reuse=False, scope_suffix='caric'):
+
         n_classes = self.n_classes
         assert scope_suffix in ['caric', 'real']
         features = []
@@ -73,6 +79,7 @@ class Hirar(object):
 
     def decoder(self, inputs, reuse=False,
                 layer=5, scope_suffix='caric'):
+
         assert layer in [1, 2, 3, 4, 5]
         # inputs: (batch, 1, 1, 512)
         net = inputs
@@ -114,6 +121,7 @@ class Hirar(object):
                     return net
 
     def discriminator(self, features, layer=5, reuse=False):
+
         # images: (batch, 64, 64, 3)
         net = features
         assert layer in [0, 1, 2, 3, 4, 5]
@@ -130,7 +138,6 @@ class Hirar(object):
                     # (batch, 64, 64, 3) -> (batch_size, 32, 32, 64)
                     if layer == 0:
                         net = slim.conv2d(net, 64, [3, 3],
-                                          activation_fn=tf.nn.relu,
                                           scope='conv1')
                         net = slim.batch_norm(net, scope='bn1')
                     # (batch_size, 32, 32, 64) -> (batch_size, 16, 16, 128)
@@ -158,12 +165,13 @@ class Hirar(object):
                     return net
 
     def transformer(self, features, layer=5, reuse=False):
+
         assert layer in [1, 2, 3, 4, 5]
         scope = 'transformer_layer_' + str(layer)
         with tf.variable_scope(scope, reuse=reuse):
             with slim.arg_scope([slim.conv2d], padding='SAME',
                                 activation_fn=None,
-                                stride=2,
+                                stride=1,
                                 weights_initializer=tf.contrib.layers.xavier_initializer()):
                 with slim.arg_scope([slim.batch_norm], decay=0.95,
                                     center=True, scale=True,
@@ -173,15 +181,27 @@ class Hirar(object):
                     # (batch, 1, 1, 512) -> (batch_size, 1, 1, 512)
                     if layer == 5:
                         net = slim.conv2d(features, 512, [1, 1],
-                                          activation_fn=tf.nn.relu,
                                           scope='conv1')
                         net = slim.batch_norm(net, scope='bn1')
-                        return net
+
+                        net = slim.conv2d(net, 512, [1, 1], scope='conv2')
+                        net = slim.batch_norm(net, scope='bn2')
+
+                        return features + net
+
                     else:
-                        print 'Not Implemented for layer', layer
-                        exit()
+                        depth = self.depth_dict[layer]
+                        net = slim.conv2d(features, depth, [3, 3],
+                                          scope='conv1')
+                        net = slim.batch_norm(net, scope='bn1')
+
+                        net = slim.conv2d(net, depth, [3, 3], scope='conv2')
+                        net = slim.batch_norm(net, scope='bn2')
+
+                        return features + net
 
     def build_model(self):
+
         if self.mode == 'pretrain':
             self.real_images = tf.placeholder(tf.float32, [None, 64, 64, 3],
                                               'real_faces')
