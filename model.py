@@ -182,20 +182,22 @@ class Hirar(object):
                                     is_training=(self.mode == 'train')):
 
                     if layer == 5:
-                        net = slim.conv2d(features, 512, [1, 1],
-                                          scope='conv1')
-                        net = slim.batch_norm(net, scope='bn1')
+                        stride = 1
                     else:
-                        depth = self.depth_dict[layer]
-                        net = slim.conv2d(features, depth, [3, 3],
-                                          scope='conv1')
-                        net = slim.batch_norm(net, scope='bn1')
+                        stride = 3
+
+                    depth = self.depth_dict[layer]
+                    net = slim.conv2d(features, depth,
+                                      [stride, stride],
+                                      scope='conv1')
+                    net = slim.batch_norm(net, scope='bn1')
 
                     for i in xrange(self.skip_layers - 1):
-                        net = slim.conv2d(net, 512, [1, 1],
-                                scope='conv%d' % (i + 2))
+                        net = slim.conv2d(net, depth,
+                                          [stride, stride],
+                                          scope='conv%d' % (i + 2))
                         net = slim.batch_norm(net,
-                                scope='bn%d' % (i + 2))
+                                              scope='bn%d' % (i + 2))
 
                     if self.skip:
                         return features + net
