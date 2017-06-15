@@ -128,7 +128,7 @@ class Hirar(object):
         # images: (batch, 64, 64, 3)
         net = features
         assert layer in [0, 1, 2, 3, 4, 5]
-        with tf.variable_scope('discriminator', reuse=reuse):
+        with tf.variable_scope('discriminator_layer_%d' % layer, reuse=reuse):
             with slim.arg_scope([slim.conv2d], padding='SAME',
                                 activation_fn=None,
                                 stride=2,
@@ -170,7 +170,7 @@ class Hirar(object):
     def transformer(self, features, layer=5, reuse=False):
 
         assert layer in [1, 2, 3, 4, 5]
-        scope = 'transformer_layer_' + str(layer)
+        scope = 'transformer_layer_%d' % layer
         with tf.variable_scope(scope, reuse=reuse):
             with slim.arg_scope([slim.conv2d], padding='SAME',
                                 activation_fn=None,
@@ -368,6 +368,11 @@ class Hirar(object):
             self.neg_class = self.discriminator(features=self.trans_real_feat,
                                                 layer=self.feat_layer,
                                                 reuse=True)
+            self.reconst_score = self.discriminator(features=self.trans_reconst,
+                                                    layer=0)
+            self.caric_score = self.discriminator(features=self.caric_images,
+                                                  layer=0,
+                                                  reuse=True)
 
             # accuracy
             self.pred = tf.argmax(self.reconst_logits, 1)
@@ -387,9 +392,12 @@ class Hirar(object):
                 + tf.losses.sparse_softmax_cross_entropy(self.real_labels,
                                                          self.real_logits)
             # adversarial_loss
-            self.loss_disc = - tf.reduce_mean(self.pos_class
-                                              - self.neg_class)
-            self.loss_gen = - tf.reduce_mean(self.neg_class)
+            self.loss_disc = -tf.reduce_mean(self.pos_class
+                                             - self.neg_class) \
+                - tf.reduce_mean(self.caric_score -
+                                 self.reconst_score)
+            self.loss_gen = - tf.reduce_mean(self.neg_class) \
+                - tf.reduce_mean(self.reconst_score)
 
             # transformer_loss
             self.loss_transformer = self.loss_gen \
