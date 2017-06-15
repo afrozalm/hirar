@@ -10,19 +10,20 @@ flags.DEFINE_integer('feat_layer', 5, "encoder layer to be transformed")
 flags.DEFINE_integer('skip_layers', 3, "number of skip connections in transformer")
 flags.DEFINE_boolean('skip', False, "to keep skip connection in transformer")
 flags.DEFINE_float('class_weight', 1.0, "weight to classification loss")
-flags.DEFINE_float('learning_rate', 1e-4, "learning rate for Adam")
+flags.DEFINE_float('learning_rate', 1e-4, "learning rate for RMSProp")
 flags.DEFINE_integer('pretrain_iter', 20000, "iterations to pretrain model")
 flags.DEFINE_integer('train_iter', 20000, "iterations to train model")
 flags.DEFINE_integer('sample_iter', 100, "iterations to get images")
 flags.DEFINE_string('pretrained_model', '',
                     "location of pretrained model")
 flags.DEFINE_string('test_model', 'model/hirar-400', "location for test model")
+flags.DEFINE_string('log_dir', 'logs', "location for log directory")
 flags.DEFINE_string('model_save_path', 'model',
                     "directory for saving the model")
 flags.DEFINE_string('sample_save_path', 'sample',
                     "directory for saving the sampled images")
-flags.DEFINE_integer('disc_rep', 3, "disc repeats for source part")
-flags.DEFINE_integer('gen_rep', 1, "gen repeats for source part")
+flags.DEFINE_integer('disc_rep', 3, "disc repeats")
+flags.DEFINE_integer('gen_rep', 1, "gen repeats")
 FLAGS = flags.FLAGS
 
 
@@ -41,6 +42,7 @@ def main(_):
                     train_iter=FLAGS.train_iter, sample_iter=100,
                     real_dir='real-face', caric_dir='caricature-face',
                     combined_dir='class-combined.pkl',
+                    log_dir=FLAGS.log_dir,
                     model_save_path=FLAGS.model_save_path,
                     sample_save_path=FLAGS.sample_save_path,
                     pretrained_model=FLAGS.pretrained_model,

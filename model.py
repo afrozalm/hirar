@@ -204,7 +204,6 @@ class Hirar(object):
                     else:
                         return net
 
-
     def build_model(self):
 
         if self.mode == 'pretrain':
@@ -397,7 +396,7 @@ class Hirar(object):
                 + self.loss_class * self.class_weight
 
             # optimizer
-            self.dec_opt = tf.train.RMSPropOptimizer(self.learning_rate * 1e-4)
+            self.dec_opt = tf.train.RMSPropOptimizer(self.learning_rate)
             self.disc_opt = tf.train.RMSPropOptimizer(self.learning_rate)
             self.trans_opt = tf.train.RMSPropOptimizer(self.learning_rate)
 
