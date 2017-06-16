@@ -204,7 +204,6 @@ class Hirar(object):
                     else:
                         return net
 
-
     def build_model(self):
 
         if self.mode == 'pretrain':
@@ -345,10 +344,10 @@ class Hirar(object):
                                                'caric_labels')
 
             # encodings, transformations and reconstructions
-            self.real_enc, self.real_logits = self.encoder(self.real_images,
-                                                           scope_suffix='real')
-            self.caric_enc, _ = self.encoder(self.caric_images,
-                                             scope_suffix='caric')
+            self.real_enc, _ = self.encoder(self.real_images,
+                                            scope_suffix='real')
+            self.caric_enc, self.caric_logits = self.encoder(self.caric_images,
+                                                             scope_suffix='caric')
 
             self.reconst_caric = self.decoder(inputs=self.caric_enc[self.feat_layer - 1],
                                               layer=self.feat_layer,
@@ -385,8 +384,8 @@ class Hirar(object):
             self.loss_class = \
                 tf.losses.sparse_softmax_cross_entropy(self.real_labels,
                                                        self.reconst_logits) \
-                + tf.losses.sparse_softmax_cross_entropy(self.real_labels,
-                                                         self.real_logits)
+                + tf.losses.sparse_softmax_cross_entropy(self.caric_labels,
+                                                         self.caric_logits)
             # adversarial_loss
             self.loss_disc = - tf.reduce_mean(self.pos_class
                                               - self.neg_class)
