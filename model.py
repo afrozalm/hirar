@@ -165,7 +165,7 @@ class Hirar(object):
                     net = slim.fully_connected(net, 50, scope='fc6')
                     # (batch_size, 50) -> #(batch_size, )
                     net = slim.fully_connected(net, 1, scope='fc7')
-                    return net
+                    return tf.nn.sigmoid(net)
 
     def transformer(self, features, layer=5, reuse=False):
 
@@ -363,9 +363,9 @@ class Hirar(object):
                                                   reuse=True)
 
             # discriminator scores
-            self.pos_class = self.discriminator(features=self.caric_enc[self.feat_layer - 1],
+            self.pos_score = self.discriminator(features=self.caric_enc[self.feat_layer - 1],
                                                 layer=self.feat_layer)
-            self.neg_class = self.discriminator(features=self.trans_real_feat,
+            self.neg_score = self.discriminator(features=self.trans_real_feat,
                                                 layer=self.feat_layer,
                                                 reuse=True)
             self.reconst_score = self.discriminator(features=self.trans_reconst,
@@ -392,12 +392,13 @@ class Hirar(object):
                 + tf.losses.sparse_softmax_cross_entropy(self.caric_labels,
                                                          self.caric_logits)
             # adversarial_loss
-            self.loss_disc = -tf.reduce_mean(self.pos_class
-                                             - self.neg_class) \
-                - tf.reduce_mean(self.caric_score -
-                                 self.reconst_score)
-            self.loss_gen = - tf.reduce_mean(self.neg_class) \
-                - tf.reduce_mean(self.reconst_score)
+            EPS = 1e-12
+            self.loss_disc = -tf.reduce_mean(
+                    tf.log(self.pos_score + EPS) + tf.log( 1 - self.neg_score + EPS)) \
+                - tf.reduce_mean(
+                    tf.log(self.caric_score + EPS) + tf.log( 1 - self.reconst_score + EPS))
+            self.loss_gen = - tf.reduce_mean(tf.log(self.neg_score + EPS)) \
+                - tf.reduce_mean(tf.log(self.reconst_score + EPS))
 
             # transformer_loss
             self.loss_transformer = self.loss_gen \
