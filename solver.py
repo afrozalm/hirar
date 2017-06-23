@@ -244,7 +244,7 @@ trans_loss: [%.6f] dec_loss: [%.6f] gen_loss: [%.6f]'
                         # train model for source domain S
                         batch_images = self.loader.next_batch('real_images')
                         feed_dict = {model.real_images: batch_images}
-                        sampled_batch_images = sess.run(model.trans_reconst,
+                        sampled_batch_images = sess.run(model.reconst_trans,
                                                         feed_dict)
 
                         # merge and save source images and sampled target image
