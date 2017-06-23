@@ -198,11 +198,10 @@ class Hirar(object):
                                           scope='conv%d' % (i + 2))
                         net = slim.batch_norm(net,
                                               scope='bn%d' % (i + 2))
+                        if self.skip and (i + 1) % 2 == 0:
+                            net = net + features
 
-                    if self.skip:
-                        return features + net
-                    else:
-                        return net
+                    return net
 
     def build_model(self):
 
@@ -354,11 +353,11 @@ class Hirar(object):
                                               scope_suffix='caric')
             self.trans_real_feat = self.transformer(features=self.real_enc[self.feat_layer - 1],
                                                     layer=self.feat_layer)
-            self.trans_reconst = self.decoder(inputs=self.trans_real_feat,
+            self.reconst_trans = self.decoder(inputs=self.trans_real_feat,
                                               reuse=True,
                                               layer=self.feat_layer,
                                               scope_suffix='caric')
-            _, self.reconst_logits = self.encoder(self.trans_reconst,
+            _, self.reconst_logits = self.encoder(self.reconst_trans,
                                                   scope_suffix='caric',
                                                   reuse=True)
 
@@ -368,7 +367,7 @@ class Hirar(object):
             self.neg_score = self.discriminator(features=self.trans_real_feat,
                                                 layer=self.feat_layer,
                                                 reuse=True)
-            self.reconst_score = self.discriminator(features=self.trans_reconst,
+            self.reconst_score = self.discriminator(features=self.reconst_trans,
                                                     layer=0)
             self.caric_score = self.discriminator(features=self.caric_images,
                                                   layer=0,
@@ -394,9 +393,11 @@ class Hirar(object):
             # adversarial_loss
             EPS = 1e-12
             self.loss_disc = -tf.reduce_mean(
-                    tf.log(self.pos_score + EPS) + tf.log( 1 - self.neg_score + EPS)) \
-                - tf.reduce_mean(
-                    tf.log(self.caric_score + EPS) + tf.log( 1 - self.reconst_score + EPS))
+                tf.log(self.pos_score + EPS)
+                + tf.log(1 - self.neg_score + EPS)) \
+                - tf.reduce_mean(tf.log(self.caric_score + EPS)
+                                 + tf.log(1 - self.reconst_score + EPS))
+
             self.loss_gen = - tf.reduce_mean(tf.log(self.neg_score + EPS)) \
                 - tf.reduce_mean(tf.log(self.reconst_score + EPS))
 
@@ -449,8 +450,8 @@ class Hirar(object):
                                                    self.real_images)
             caric_images_summary = tf.summary.image('caric_images',
                                                     self.caric_images)
-            trans_reconst_summary = tf.summary.image('trans_reconst',
-                                                     self.trans_reconst)
+            trans_reconst_summary = tf.summary.image('reconst_trans',
+                                                     self.reconst_trans)
             caric_reconst_summary = tf.summary.image('caric_reconst',
                                                      self.reconst_caric)
             self.summary_op = tf.summary.merge([gen_loss_summary,
