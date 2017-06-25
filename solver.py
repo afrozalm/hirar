@@ -189,14 +189,15 @@ class Solver(object):
             tf.global_variables_initializer().run()
 
             # restore variables of F and G
-            pretrained_scopes = ['encoder_caric', 'encoder_real',
-                                 'decoder_caric']
-            print ('loading pretrained model ..')
-            for scope in pretrained_scopes:
-                variables_to_restore = \
-                    slim.get_model_variables(scope=scope)
-                restorer = tf.train.Saver(variables_to_restore)
-                restorer.restore(sess, self.pretrained_model)
+            if self.pretrained_model != '':
+                print ('loading pretrained model ..')
+                pretrained_scopes = ['encoder_caric', 'encoder_real',
+                                     'decoder_caric']
+                for scope in pretrained_scopes:
+                    variables_to_restore = \
+                        slim.get_model_variables(scope=scope)
+                    restorer = tf.train.Saver(variables_to_restore)
+                    restorer.restore(sess, self.pretrained_model)
 
             summary_writer = tf.summary.FileWriter(
                 logdir=self.log_dir, graph=tf.get_default_graph())
