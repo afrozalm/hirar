@@ -9,7 +9,7 @@ class Hirar(object):
 
     def __init__(self, mode='train', learning_rate=0.0003,
                  n_classes=10, class_weight=1.0, feat_layer=5,
-                 skip=True, skip_layers=2):
+                 skip=True, skip_layers=2, adv_weight=1.0):
 
         self.mode = mode
         self.skip_layers = skip_layers
@@ -17,6 +17,7 @@ class Hirar(object):
         self.learning_rate = learning_rate
         self.n_classes = n_classes
         self.class_weight = class_weight
+        self.adv_weight = adv_weight
         self.feat_layer = feat_layer
         self.depth_dict = {1: 64,
                            2: 128,
@@ -402,7 +403,7 @@ class Hirar(object):
                 - tf.reduce_mean(tf.log(self.reconst_score + EPS))
 
             # transformer_loss
-            self.loss_transformer = self.loss_gen \
+            self.loss_transformer = self.loss_gen * self.adv_weight\
                 + self.loss_class * self.class_weight
 
             # optimizer
