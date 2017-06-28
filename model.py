@@ -166,7 +166,7 @@ class Hirar(object):
                     net = slim.fully_connected(net, 50, scope='fc6')
                     # (batch_size, 50) -> #(batch_size, )
                     net = slim.fully_connected(net, 1, scope='fc7')
-                    return tf.nn.sigmoid(net)
+                    return net
 
     def transformer(self, features, layer=5, reuse=False):
 
@@ -368,6 +368,9 @@ class Hirar(object):
             self.neg_score = self.discriminator(features=self.trans_real_feat,
                                                 layer=self.feat_layer,
                                                 reuse=True)
+            self.real_prob = tf.nn.sigmoid(self.pos_score)
+            self.fake_prob = tf.nn.sigmoid(self.neg_score)
+
             self.reconst_score = self.discriminator(features=self.reconst_trans,
                                                     layer=0)
             self.caric_score = self.discriminator(features=self.caric_images,
@@ -395,12 +398,17 @@ class Hirar(object):
             EPS = 1e-12
             self.loss_disc = -tf.reduce_mean(
                 tf.log(self.pos_score + EPS)
-                + tf.log(1 - self.neg_score + EPS)) \
-                - tf.reduce_mean(tf.log(self.caric_score + EPS)
-                                 + tf.log(1 - self.reconst_score + EPS))
+                + tf.log(1 - self.neg_score + EPS)
+                + tf.log(self.caric_score + EPS) * 10.0
+                + tf.log(1 - self.reconst_score + EPS)) * 10.0 \
+                - tf.reduce_mean(self.pos_score - self.neg_score +
+                                 10.0 * (self.caric_score
+                                         - self.reconst_score))
 
-            self.loss_gen = - tf.reduce_mean(tf.log(self.neg_score + EPS)) \
-                - tf.reduce_mean(tf.log(self.reconst_score + EPS))
+            self.loss_gen = - tf.reduce_mean(
+                tf.log(self.neg_score + EPS)
+                + tf.log(self.reconst_score + EPS) * 10.0 +
+                self.neg_score + self.reconst_score * 10.0)
 
             # transformer_loss
             self.loss_transformer = self.loss_gen * self.adv_weight\
