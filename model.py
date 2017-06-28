@@ -376,6 +376,8 @@ class Hirar(object):
             self.caric_score = self.discriminator(features=self.caric_images,
                                                   layer=0,
                                                   reuse=True)
+            self.caric_prob = tf.nn.sigmoid(self.caric_score)
+            self.reconst_prob = tf.nn.sigmoid(self.reconst_score)
 
             # accuracy
             self.pred = tf.argmax(self.reconst_logits, 1)
@@ -397,17 +399,17 @@ class Hirar(object):
             # adversarial_loss
             EPS = 1e-12
             self.loss_disc = -tf.reduce_mean(
-                tf.log(self.pos_score + EPS)
-                + tf.log(1 - self.neg_score + EPS)
-                + tf.log(self.caric_score + EPS) * 10.0
-                + tf.log(1 - self.reconst_score + EPS)) * 10.0 \
+                tf.log(self.real_prob + EPS)
+                + tf.log(1 - self.fake_prob + EPS)
+                + tf.log(self.caric_prob + EPS) * 10.0
+                + tf.log(1 - self.reconst_prob + EPS)) * 10.0 \
                 - tf.reduce_mean(self.pos_score - self.neg_score +
                                  10.0 * (self.caric_score
                                          - self.reconst_score))
 
             self.loss_gen = - tf.reduce_mean(
-                tf.log(self.neg_score + EPS)
-                + tf.log(self.reconst_score + EPS) * 10.0 +
+                tf.log(self.fake_prob + EPS)
+                + tf.log(self.reconst_prob + EPS) * 10.0 +
                 self.neg_score + self.reconst_score * 10.0)
 
             # transformer_loss
