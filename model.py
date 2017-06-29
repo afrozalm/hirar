@@ -418,19 +418,19 @@ class Hirar(object):
                 + tf.losses.sparse_softmax_cross_entropy(self.caric_labels,
                                                          self.caric_logits)
             # adversarial_loss
-            EPS = 1e-12
+            EPS = 1e-32
             self.loss_disc = -tf.reduce_mean(
-                tf.log(self.real_prob + EPS)
-                + tf.log(1 - self.fake_prob + EPS)
-                + tf.log(self.caric_prob + EPS) * 10.0
-                + tf.log(1 - self.reconst_prob + EPS)) * 10.0 \
+                tf.log(self.real_prob + EPS) * 10.0
+                + tf.log(1 - self.fake_prob + EPS) * 10.0
+                + tf.log(self.caric_prob + EPS)
+                + tf.log(1 - self.reconst_prob + EPS)) \
                 # - tf.reduce_mean(self.pos_score - self.neg_score +
                                  # 10.0 * (self.caric_score
                                          # - self.reconst_score)) * 1e-5
 
             self.loss_gen = - tf.reduce_mean(
-                tf.log(self.fake_prob + EPS)
-                + tf.log(self.reconst_prob + EPS) * 10.0) \
+                tf.log(self.fake_prob) * 10.0
+                + tf.log(self.reconst_prob)) \
                 # - tf.reduce_mean(
                 # 1e-5 * (self.neg_score + self.reconst_score * 10.0))
 
@@ -487,6 +487,10 @@ class Hirar(object):
                                                    self.caric_accr)
             disc_loss_summary = tf.summary.scalar('disc_loss',
                                                   self.loss_disc)
+            real_prob_summary = tf.summary.scalar('real_prob',
+                                                   tf.reduce_mean(self.real_prob))
+            fake_prob_summary = tf.summary.scalar('fake_prob',
+                                                   tf.reduce_mean(self.fake_prob))
             trans_loss_summary = tf.summary.scalar('transformer_loss',
                                                    self.loss_transformer)
             real_images_summary = tf.summary.image('real_images',
@@ -503,6 +507,8 @@ class Hirar(object):
                                                 dec_loss_summary,
                                                 t_accuracy_summary,
                                                 c_accuracy_summary,
+                                                real_prob_summary,
+                                                fake_prob_summary,
                                                 disc_loss_summary,
                                                 trans_loss_summary,
                                                 real_images_summary,
