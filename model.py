@@ -380,11 +380,17 @@ class Hirar(object):
             self.reconst_prob = tf.nn.sigmoid(self.reconst_score)
 
             # accuracy
-            self.pred = tf.argmax(self.reconst_logits, 1)
-            self.correct_pred = tf.equal(self.pred,
-                                         self.real_labels)
+            pred = tf.argmax(self.reconst_logits, 1)
+            correct_pred = tf.equal(pred,
+                                    self.real_labels)
             self.trans_accr = tf.reduce_mean(tf.cast(
-                self.correct_pred, tf.float32))
+                correct_pred, tf.float32))
+
+            pred = tf.argmax(self.caric_logits, 1)
+            correct_pred = tf.equal(pred,
+                                    self.caric_labels)
+            self.caric_accr = tf.reduce_mean(tf.cast(
+                correct_pred, tf.float32))
 
             # loss_decoder
             self.loss_decoder = tf.reduce_mean(tf.losses.absolute_difference(
@@ -451,8 +457,10 @@ class Hirar(object):
                                                  self.loss_gen)
             dec_loss_summary = tf.summary.scalar('loss_dec',
                                                  self.loss_decoder)
-            accuracy_summary = tf.summary.scalar('trans_accr',
-                                                 self.trans_accr)
+            t_accuracy_summary = tf.summary.scalar('trans_accr',
+                                                   self.trans_accr)
+            c_accuracy_summary = tf.summary.scalar('caric_accr',
+                                                   self.caric_accr)
             disc_loss_summary = tf.summary.scalar('disc_loss',
                                                   self.loss_disc)
             trans_loss_summary = tf.summary.scalar('transformer_loss',
@@ -467,7 +475,8 @@ class Hirar(object):
                                                      self.reconst_caric)
             self.summary_op = tf.summary.merge([gen_loss_summary,
                                                 dec_loss_summary,
-                                                accuracy_summary,
+                                                t_accuracy_summary,
+                                                c_accuracy_summary,
                                                 disc_loss_summary,
                                                 trans_loss_summary,
                                                 real_images_summary,
