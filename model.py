@@ -434,7 +434,8 @@ class Hirar(object):
                 1e-5 * (self.neg_score + self.reconst_score * 10.0))
 
             # transformer_loss
-            self.loss_transformer = self.loss_gen * self.adv_weight
+            self.loss_transformer = self.loss_gen * self.adv_weight \
+                + self.loss_class * self.class_weight
 
             # optimizer
             self.enc_opt = tf.train.RMSPropOptimizer(self.learning_rate)
