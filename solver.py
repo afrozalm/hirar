@@ -192,7 +192,7 @@ class Solver(object):
             if self.pretrained_model != '':
                 print ('loading pretrained model ..')
                 pretrained_scopes = ['encoder_caric', 'encoder_real',
-                                     'decoder_caric']
+                                     'decoder_caric', 'decoder_real']
                 for scope in pretrained_scopes:
                     variables_to_restore = \
                         slim.get_model_variables(scope=scope)

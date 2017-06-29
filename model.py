@@ -424,14 +424,15 @@ class Hirar(object):
                 + tf.log(1 - self.fake_prob + EPS)
                 + tf.log(self.caric_prob + EPS) * 10.0
                 + tf.log(1 - self.reconst_prob + EPS)) * 10.0 \
-                - tf.reduce_mean(self.pos_score - self.neg_score +
-                                 10.0 * (self.caric_score
-                                         - self.reconst_score)) * 1e-5
+                # - tf.reduce_mean(self.pos_score - self.neg_score +
+                                 # 10.0 * (self.caric_score
+                                         # - self.reconst_score)) * 1e-5
 
             self.loss_gen = - tf.reduce_mean(
                 tf.log(self.fake_prob + EPS)
-                + tf.log(self.reconst_prob + EPS) * 10.0 +
-                1e-5 * (self.neg_score + self.reconst_score * 10.0))
+                + tf.log(self.reconst_prob + EPS) * 10.0) \
+                # - tf.reduce_mean(
+                # 1e-5 * (self.neg_score + self.reconst_score * 10.0))
 
             # transformer_loss
             self.loss_transformer = self.loss_gen * self.adv_weight \
