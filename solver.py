@@ -220,7 +220,8 @@ class Solver(object):
                 for _ in xrange(self.disc_rep):
                     sess.run(model.disc_op, feed_dict)
                 for _ in xrange(self.gen_rep):
-                    sess.run([model.trans_op, model.dec_op], feed_dict)
+                    sess.run([model.trans_op, model.dec_op, model.enc_op],
+                             feed_dict)
 
                 if (step + 1) % 10 == 0:
                     summary, discl, trl, decl, gl = \

@@ -25,9 +25,18 @@ class Hirar(object):
                            4: 512,
                            5: 512}
 
+    def classifier(self, encodings, scope_suffix='caric', reuse=False):
+
+        assert scope_suffix in ['caric', 'real']
+        with tf.variable_scope('classifier_' + scope_suffix,
+                               reuse=reuse):
+            flattened = slim.flatten(encodings)
+            l1 = slim.fully_connected(flattened, 400, scope='fc1')
+            l2 = slim.fully_connected(l1, self.n_classes, scope='fc2')
+            return l2
+
     def encoder(self, images, reuse=False, scope_suffix='caric'):
 
-        n_classes = self.n_classes
         assert scope_suffix in ['caric', 'real']
         features = []
 
@@ -73,12 +82,10 @@ class Hirar(object):
                                           scope='bn5')
                     features.append(lr5)
 
-                    # (batch_size, 1, 1, n_classes)
-                    logits = slim.conv2d(lr5, n_classes, [1, 1],
-                                         padding='VALID',
-                                         scope='out')
                     # (batch_size, n_classes)
-                    logits = slim.flatten(logits)
+                    logits = self.classifier(encodings=lr5,
+                                             scope_suffix=scope_suffix,
+                                             reuse=reuse)
                     return features, logits
 
     def decoder(self, inputs, reuse=False,
@@ -352,6 +359,9 @@ class Hirar(object):
             self.reconst_caric = self.decoder(inputs=self.caric_enc[self.feat_layer - 1],
                                               layer=self.feat_layer,
                                               scope_suffix='caric')
+            self.reconst_real = self.decoder(inputs=self.real_enc[self.feat_layer - 1],
+                                             layer=self.feat_layer,
+                                             scope_suffix='real')
             self.trans_real_feat = self.transformer(features=self.real_enc[self.feat_layer - 1],
                                                     layer=self.feat_layer)
             self.reconst_trans = self.decoder(inputs=self.trans_real_feat,
@@ -393,8 +403,13 @@ class Hirar(object):
                 correct_pred, tf.float32))
 
             # loss_decoder
-            self.loss_decoder = tf.reduce_mean(tf.losses.absolute_difference(
-                self.reconst_caric, self.caric_images))
+            def get_reconst_loss(a, b):
+                return tf.reduce_mean(tf.losses.absolute_difference(a, b))
+
+            self.loss_decoder = get_reconst_loss(self.reconst_caric,
+                                                 self.caric_images) \
+                + get_reconst_loss(self.reconst_real,
+                                   self.real_images)
 
             # classification_loss
             self.loss_class = \
@@ -419,10 +434,10 @@ class Hirar(object):
                 1e-5 * (self.neg_score + self.reconst_score * 10.0))
 
             # transformer_loss
-            self.loss_transformer = self.loss_gen * self.adv_weight\
-                + self.loss_class * self.class_weight
+            self.loss_transformer = self.loss_gen * self.adv_weight
 
             # optimizer
+            self.enc_opt = tf.train.RMSPropOptimizer(self.learning_rate)
             self.dec_opt = tf.train.RMSPropOptimizer(self.learning_rate)
             self.disc_opt = tf.train.RMSPropOptimizer(self.learning_rate)
             self.trans_opt = tf.train.RMSPropOptimizer(self.learning_rate)
@@ -434,7 +449,10 @@ class Hirar(object):
             trans_vars = \
                 [var for var in all_vars if 'transformer' in var.name]
             dec_vars = \
-                [var for var in all_vars if 'decoder_caric' in var.name]
+                [var for var in all_vars if 'decoder_' in var.name]
+            enc_vars = \
+                [var for var in all_vars if (
+                    'encoder_' in var.name or 'classifier_' in var.name)]
 
             # train op
             with tf.variable_scope('train_op', reuse=False):
@@ -451,6 +469,10 @@ class Hirar(object):
                     self.loss_decoder,
                     self.dec_opt,
                     variables_to_train=dec_vars)
+                self.enc_op = slim.learning.create_train_op(
+                    self.loss_class,
+                    self.enc_opt,
+                    variables_to_train=enc_vars)
 
             # summary op
             gen_loss_summary = tf.summary.scalar('gen_loss',
@@ -469,6 +491,8 @@ class Hirar(object):
                                                    self.real_images)
             caric_images_summary = tf.summary.image('caric_images',
                                                     self.caric_images)
+            real_reconst_summary = tf.summary.image('real_reconst',
+                                                    self.reconst_real)
             trans_reconst_summary = tf.summary.image('reconst_trans',
                                                      self.reconst_trans)
             caric_reconst_summary = tf.summary.image('caric_reconst',
@@ -481,5 +505,6 @@ class Hirar(object):
                                                 trans_loss_summary,
                                                 real_images_summary,
                                                 caric_images_summary,
+                                                real_reconst_summary,
                                                 trans_reconst_summary,
                                                 caric_reconst_summary])
