@@ -164,15 +164,15 @@ class Hirar(object):
                         net = slim.conv2d(net, 512, [3, 3], scope='conv4')
                         net = slim.batch_norm(net, scope='bn4')
                     # (batch_size, 4, 4, 512) -> (batch_size, 1, 1, 512)
-                    if layer <= 4:
-                        net = slim.conv2d(net, 512, [4, 4], padding='VALID',
-                                          scope='conv5')
-                        net = slim.batch_norm(net, scope='bn5')
-                    net = slim.flatten(net)
+                    # if layer <= 4:
+                        # net = slim.conv2d(net, 512, [4, 4], padding='VALID',
+                                          # scope='conv5')
+                        # net = slim.batch_norm(net, scope='bn5')
+                    # net = slim.flatten(net)
                     # (batch_size, 512) -> #(batch_size, 50)
-                    net = slim.fully_connected(net, 50, scope='fc6')
+                    # net = slim.fully_connected(net, 50, scope='fc6')
                     # (batch_size, 50) -> #(batch_size, )
-                    net = slim.fully_connected(net, 1, scope='fc7')
+                    # net = slim.fully_connected(net, 1, scope='fc7')
                     return net
 
     def transformer(self, features, layer=5, reuse=False):
@@ -420,17 +420,17 @@ class Hirar(object):
             # adversarial_loss
             EPS = 1e-32
             self.loss_disc = -tf.reduce_mean(
-                tf.log(self.real_prob + EPS) * 10.0
-                + tf.log(1 - self.fake_prob + EPS) * 10.0
-                + tf.log(self.caric_prob + EPS)
-                + tf.log(1 - self.reconst_prob + EPS)) \
+                tf.log(self.real_prob + EPS)
+                + tf.log(1 - self.fake_prob + EPS)
+                + tf.log(self.caric_prob + EPS) * 10.0
+                + tf.log(1 - self.reconst_prob + EPS)) * 10.0 \
                 # - tf.reduce_mean(self.pos_score - self.neg_score +
                                  # 10.0 * (self.caric_score
                                          # - self.reconst_score)) * 1e-5
 
             self.loss_gen = - tf.reduce_mean(
-                tf.log(self.fake_prob) * 10.0
-                + tf.log(self.reconst_prob)) \
+                tf.log(self.fake_prob)
+                + tf.log(self.reconst_prob)) * 10.0 \
                 # - tf.reduce_mean(
                 # 1e-5 * (self.neg_score + self.reconst_score * 10.0))
 
