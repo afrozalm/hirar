@@ -34,6 +34,7 @@ def main(_):
                   learning_rate=FLAGS.learning_rate,
                   n_classes=FLAGS.n_classes,
                   class_weight=FLAGS.class_weight,
+                  adv_weight=FLAGS.adv_weight,
                   skip=FLAGS.skip,
                   skip_layers=FLAGS.skip_layers,
                   feat_layer=FLAGS.feat_layer)
