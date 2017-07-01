@@ -134,6 +134,9 @@ class Hirar(object):
     def discriminator(self, features, layer=5, reuse=False):
 
         # images: (batch, 64, 64, 3)
+        def lrelu(x, leak=0.2, name='leaky_relu'):
+            return tf.maximum(x, leak*x)
+
         net = features
         assert layer in [0, 1, 2, 3, 4, 5]
         with tf.variable_scope('discriminator_layer_%d' % layer, reuse=reuse):
@@ -143,7 +146,7 @@ class Hirar(object):
                                 weights_initializer=tf.contrib.layers.xavier_initializer()):
                 with slim.arg_scope([slim.batch_norm], decay=0.95,
                                     center=True, scale=True,
-                                    activation_fn=tf.nn.relu,
+                                    activation_fn=lrelu,
                                     is_training=(self.mode == 'train')):
 
                     # (batch, 64, 64, 3) -> (batch_size, 32, 32, 64)
