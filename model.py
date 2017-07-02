@@ -433,7 +433,7 @@ class Hirar(object):
 
             self.loss_gen = - tf.reduce_mean(
                 tf.log(self.fake_prob)
-                + tf.log(self.reconst_prob)) * 10.0 \
+                + tf.log(self.reconst_prob) * 10.0) \
                 # - tf.reduce_mean(
                 # 1e-5 * (self.neg_score + self.reconst_score * 10.0))
 
