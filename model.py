@@ -488,6 +488,8 @@ class Hirar(object):
             # summary op
             gen_loss_summary = tf.summary.scalar('gen_loss',
                                                  self.loss_gen)
+            tv_loss_summary = tf.summary.scalar('loss_total_variation',
+                                                 self.loss_tv)
             dec_loss_summary = tf.summary.scalar('loss_dec',
                                                  self.loss_decoder)
             t_accuracy_summary = tf.summary.scalar('trans_accr',
@@ -518,6 +520,7 @@ class Hirar(object):
                                                 c_accuracy_summary,
                                                 real_prob_summary,
                                                 fake_prob_summary,
+                                                tv_loss_summary,
                                                 disc_loss_summary,
                                                 trans_loss_summary,
                                                 real_images_summary,
