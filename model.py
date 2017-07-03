@@ -9,11 +9,13 @@ class Hirar(object):
 
     def __init__(self, mode='train', learning_rate=0.0003,
                  n_classes=10, class_weight=1.0, feat_layer=5,
-                 skip=True, skip_layers=2, adv_weight=1.0):
+                 skip=True, skip_layers=2, adv_weight=1.0,
+                 tv_weight=1.0):
 
         self.mode = mode
         self.skip_layers = skip_layers
         self.skip = skip
+        self.tv_weight = tv_weight
         self.learning_rate = learning_rate
         self.n_classes = n_classes
         self.class_weight = class_weight
@@ -135,7 +137,7 @@ class Hirar(object):
 
         # images: (batch, 64, 64, 3)
         def lrelu(x, leak=0.2, name='leaky_relu'):
-            return tf.maximum(x, leak*x)
+            return tf.maximum(x, leak * x)
 
         net = features
         assert layer in [0, 1, 2, 3, 4, 5]
@@ -169,7 +171,7 @@ class Hirar(object):
                     # (batch_size, 4, 4, 512) -> (batch_size, 1, 1, 512)
                     # if layer <= 4:
                         # net = slim.conv2d(net, 512, [4, 4], padding='VALID',
-                                          # scope='conv5')
+                        # scope='conv5')
                         # net = slim.batch_norm(net, scope='bn5')
                     # net = slim.flatten(net)
                     # (batch_size, 512) -> #(batch_size, 50)
@@ -428,18 +430,22 @@ class Hirar(object):
                 + tf.log(self.caric_prob + EPS) * 10.0
                 + tf.log(1 - self.reconst_prob + EPS)) * 10.0 \
                 # - tf.reduce_mean(self.pos_score - self.neg_score +
-                                 # 10.0 * (self.caric_score
-                                         # - self.reconst_score)) * 1e-5
+            # 10.0 * (self.caric_score
+            # - self.reconst_score)) * 1e-5
 
             self.loss_gen = - tf.reduce_mean(
                 tf.log(self.fake_prob)
                 + tf.log(self.reconst_prob) * 10.0) \
                 # - tf.reduce_mean(
-                # 1e-5 * (self.neg_score + self.reconst_score * 10.0))
+            # 1e-5 * (self.neg_score + self.reconst_score * 10.0))
+
+            self.loss_tv = self.tv_weight * tf.reduce_mean(
+                tf.image.total_variation(images=self.reconst_trans))
 
             # transformer_loss
             self.loss_transformer = self.loss_gen * self.adv_weight \
-                + self.loss_class * self.class_weight
+                + self.loss_class * self.class_weight \
+                + self.loss_tv
 
             # optimizer
             self.enc_opt = tf.train.RMSPropOptimizer(self.learning_rate)
@@ -491,9 +497,9 @@ class Hirar(object):
             disc_loss_summary = tf.summary.scalar('disc_loss',
                                                   self.loss_disc)
             real_prob_summary = tf.summary.scalar('real_prob',
-                                                   tf.reduce_mean(self.real_prob))
+                                                  tf.reduce_mean(self.real_prob))
             fake_prob_summary = tf.summary.scalar('fake_prob',
-                                                   tf.reduce_mean(self.fake_prob))
+                                                  tf.reduce_mean(self.fake_prob))
             trans_loss_summary = tf.summary.scalar('transformer_loss',
                                                    self.loss_transformer)
             real_images_summary = tf.summary.image('real_images',

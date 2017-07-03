@@ -11,6 +11,7 @@ flags.DEFINE_integer('skip_layers', 3, "number of skip connections in transforme
 flags.DEFINE_boolean('skip', False, "to keep skip connection in transformer")
 flags.DEFINE_float('class_weight', 1.0, "weight to classification loss")
 flags.DEFINE_float('adv_weight', 1.0, "weight to adversarial loss")
+flags.DEFINE_float('tv_weight', 1.0, "weight to total variation loss")
 flags.DEFINE_float('learning_rate', 1e-4, "learning rate for RMSProp")
 flags.DEFINE_integer('pretrain_iter', 20000, "iterations to pretrain model")
 flags.DEFINE_integer('train_iter', 20000, "iterations to train model")
@@ -37,7 +38,8 @@ def main(_):
                   adv_weight=FLAGS.adv_weight,
                   skip=FLAGS.skip,
                   skip_layers=FLAGS.skip_layers,
-                  feat_layer=FLAGS.feat_layer)
+                  feat_layer=FLAGS.feat_layer,
+                  tv_weight=FLAGS.tv_weight)
 
     solver = Solver(model, batch_size=FLAGS.batch_size,
                     pretrain_iter=FLAGS.pretrain_iter,
