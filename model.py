@@ -428,7 +428,7 @@ class Hirar(object):
                 tf.log(self.real_prob + EPS)
                 + tf.log(1 - self.fake_prob + EPS)
                 + tf.log(self.caric_prob + EPS) * 10.0
-                + tf.log(1 - self.reconst_prob + EPS)) * 10.0 \
+                + tf.log(1 - self.reconst_prob + EPS) * 10.0) \
                 # - tf.reduce_mean(self.pos_score - self.neg_score +
             # 10.0 * (self.caric_score
             # - self.reconst_score)) * 1e-5
@@ -498,6 +498,10 @@ class Hirar(object):
                                                    self.caric_accr)
             disc_loss_summary = tf.summary.scalar('disc_loss',
                                                   self.loss_disc)
+            caric_prob_summary = tf.summary.scalar('caric_prob',
+                                                  tf.reduce_mean(self.caric_prob))
+            reconst_prob_summary = tf.summary.scalar('reconst_prob',
+                                                  tf.reduce_mean(self.reconst_prob))
             real_prob_summary = tf.summary.scalar('real_prob',
                                                   tf.reduce_mean(self.real_prob))
             fake_prob_summary = tf.summary.scalar('fake_prob',
@@ -522,6 +526,8 @@ class Hirar(object):
                                                 fake_prob_summary,
                                                 tv_loss_summary,
                                                 disc_loss_summary,
+                                                caric_prob_summary,
+                                                reconst_prob_summary,
                                                 trans_loss_summary,
                                                 real_images_summary,
                                                 caric_images_summary,
