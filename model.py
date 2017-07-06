@@ -182,6 +182,9 @@ class Hirar(object):
 
     def transformer(self, features, layer=5, reuse=False):
 
+        def lrelu(x, leak=0.2, name='leaky_relu'):
+            return tf.maximum(x, leak * x)
+
         assert layer in [1, 2, 3, 4, 5]
         scope = 'transformer_layer_%d' % layer
         with tf.variable_scope(scope, reuse=reuse):
@@ -191,7 +194,7 @@ class Hirar(object):
                                 weights_initializer=tf.contrib.layers.xavier_initializer()):
                 with slim.arg_scope([slim.batch_norm], decay=0.95,
                                     center=True, scale=True,
-                                    activation_fn=tf.nn.relu,
+                                    activation_fn=lrelu,
                                     is_training=(self.mode == 'train')):
 
                     if layer == 5:

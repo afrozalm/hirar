@@ -192,12 +192,22 @@ class Solver(object):
             if self.pretrained_model != '':
                 print ('loading pretrained model ..')
                 pretrained_scopes = ['encoder_caric', 'encoder_real',
-                                     'decoder_caric', 'decoder_real']
+                                     'decoder_caric', 'decoder_real',
+                                     'transformer_layer_1', 'transformer_layer_2',
+                                     'transformer_layer_3', 'transformer_layer_4',
+                                     'transformer_layer_5', 'discriminator_layer_1',
+                                     'discriminator_layer_2', 'discriminator_layer_3',
+                                     'discriminator_layer_4', 'discriminator_layer_5'
+                                    ]
                 for scope in pretrained_scopes:
-                    variables_to_restore = \
-                        slim.get_model_variables(scope=scope)
-                    restorer = tf.train.Saver(variables_to_restore)
-                    restorer.restore(sess, self.pretrained_model)
+                    try:
+                        variables_to_restore = \
+                            slim.get_model_variables(scope=scope)
+                        restorer = tf.train.Saver(variables_to_restore)
+                        restorer.restore(sess, self.pretrained_model)
+                        print scope + ' restored'
+                    except:
+                        pass
 
             summary_writer = tf.summary.FileWriter(
                 logdir=self.log_dir, graph=tf.get_default_graph())
