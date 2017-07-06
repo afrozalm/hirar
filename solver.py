@@ -20,12 +20,14 @@ class Solver(object):
                  pretrained_model='model/pre_model-4000',
                  test_model='model/hirar-400',
                  skip_layers=3,
+                 feat_layer=2,
                  disc_rep=1,
                  gen_rep=1):
 
         self.loader = DataLoader(batch_size)
         self.model = model
         self.skip_layers = skip_layers
+        self.feat_layer = feat_layer
         self.batch_size = batch_size
         self.n_classes = n_classes
         self.pretrain_iter = pretrain_iter
@@ -42,7 +44,7 @@ class Solver(object):
         self.config = tf.ConfigProto()
         self.config.gpu_options.allow_growth = True
         self.disc_rep = disc_rep
-        self.gen_rep = gen_rep
+        self.gen_rep = gen_rep 
 
     def load_real(self, image_dir, split='train'):
         print ('loading real faces..')
@@ -254,7 +256,7 @@ trans_loss: [%.6f] dec_loss: [%.6f] gen_loss: [%.6f]'
                 if (step + 1) % 200 == 0:
                     saver.save(sess, os.path.join(
                         self.model_save_path, 'hirar'), global_step=step + 1)
-                    print ('model/hirar-%d saved' % (step + 1))
+                    print ('model/hirar%d-%d saved' % (self.feat_layer, step + 1))
 
                 if (step + 1) % 5000 == 0:
                     for i in range(self.sample_iter):
