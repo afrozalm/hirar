@@ -19,11 +19,13 @@ class Solver(object):
                  model_save_path='model',
                  pretrained_model='model/pre_model-4000',
                  test_model='model/hirar-400',
+                 skip_layers=3,
                  disc_rep=1,
                  gen_rep=1):
 
         self.loader = DataLoader(batch_size)
         self.model = model
+        self.skip_layers = skip_layers
         self.batch_size = batch_size
         self.n_classes = n_classes
         self.pretrain_iter = pretrain_iter
@@ -191,14 +193,17 @@ class Solver(object):
             # restore variables of F and G
             if self.pretrained_model != '':
                 print ('loading pretrained model ..')
+
                 pretrained_scopes = ['encoder_caric', 'encoder_real',
                                      'decoder_caric', 'decoder_real',
-                                     'transformer_layer_1', 'transformer_layer_2',
-                                     'transformer_layer_3', 'transformer_layer_4',
-                                     'transformer_layer_5', 'discriminator_layer_1',
+                                     'discriminator_layer_1',
                                      'discriminator_layer_2', 'discriminator_layer_3',
                                      'discriminator_layer_4', 'discriminator_layer_5'
                                     ]
+                for i in xrange(1, 6):
+                    for j in xrange(1, self.skip_layers):
+                        pretrained_scopes += ['transformer_layer_%d/conv%d'%(i, j)]
+                        pretrained_scopes += ['transformer_layer_%d/bn%d'%(i, j)]
                 for scope in pretrained_scopes:
                     try:
                         variables_to_restore = \

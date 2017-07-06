@@ -50,6 +50,7 @@ def main(_):
                     model_save_path=FLAGS.model_save_path,
                     sample_save_path=FLAGS.sample_save_path,
                     pretrained_model=FLAGS.pretrained_model,
+                    skip_layers=FLAGS.skip_layers,
                     test_model=FLAGS.test_model,
                     disc_rep=FLAGS.disc_rep,
                     gen_rep=FLAGS.gen_rep)
