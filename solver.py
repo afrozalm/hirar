@@ -201,7 +201,7 @@ class Solver(object):
                                      'discriminator_layer_4', 'discriminator_layer_5'
                                     ]
                 for i in xrange(1, 6):
-                    for j in xrange(1, self.skip_layers):
+                    for j in xrange(1, self.skip_layers + 1):
                         pretrained_scopes += ['transformer_layer_%d/conv%d'%(i, j)]
                         pretrained_scopes += ['transformer_layer_%d/bn%d'%(i, j)]
                 for scope in pretrained_scopes:
