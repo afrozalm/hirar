@@ -464,9 +464,9 @@ class Hirar(object):
                 [var for var in all_vars if 'transformer' in var.name]
             dec_vars = \
                 [var for var in all_vars if 'decoder_' in var.name]
-            enc_vars = \
-                [var for var in all_vars if (
-                    'encoder_' in var.name or 'classifier_' in var.name)]
+            # enc_vars = \
+                # [var for var in all_vars if (
+                    # 'encoder_' in var.name or 'classifier_' in var.name)]
 
             # train op
             with tf.variable_scope('train_op', reuse=False):
@@ -483,10 +483,10 @@ class Hirar(object):
                     self.loss_decoder,
                     self.dec_opt,
                     variables_to_train=dec_vars)
-                self.enc_op = slim.learning.create_train_op(
-                    self.loss_class,
-                    self.enc_opt,
-                    variables_to_train=enc_vars)
+                # self.enc_op = slim.learning.create_train_op(
+                    # self.loss_class,
+                    # self.enc_opt,
+                    # variables_to_train=enc_vars)
 
             # summary op
             gen_loss_summary = tf.summary.scalar('gen_loss',
