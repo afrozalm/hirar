@@ -279,12 +279,12 @@ class Hirar(object):
 
             # loss and train op
             self.loss_reconst_caric, self.loss_reconst_real = 0.0, 0.0
-            for reconst_real in self.reconst_reals:
+            for reconst_real, wt in zip(self.reconst_reals, range(1, 6)):
                 self.loss_reconst_real += tf.reduce_mean(tf.square(
-                    self.real_images - reconst_real))
-            for reconst_caric in self.reconst_carics:
+                    self.real_images - reconst_real)) * wt
+            for reconst_caric, wt in zip(self.reconst_carics, range(1, 6)):
                 self.loss_reconst_caric += tf.reduce_mean(tf.square(
-                    self.caric_images - reconst_caric))
+                    self.caric_images - reconst_caric)) * wt
             self.loss_reconst = self.loss_reconst_caric \
                 + self.loss_reconst_real
 
