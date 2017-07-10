@@ -44,7 +44,7 @@ class Solver(object):
         self.config = tf.ConfigProto()
         self.config.gpu_options.allow_growth = True
         self.disc_rep = disc_rep
-        self.gen_rep = gen_rep 
+        self.gen_rep = gen_rep
 
     def load_real(self, image_dir, split='train'):
         print ('loading real faces..')
@@ -250,13 +250,12 @@ class Solver(object):
                                   model.loss_gen],
                                  feed_dict)
                     summary_writer.add_summary(summary, step)
-                    print ('[Source] step: [%d/%d] disc_loss: [%.6f] \
-trans_loss: [%.6f] dec_loss: [%.6f] gen_loss: [%.6f]'
-                           % (step + 1, self.train_iter, discl, trl, decl, gl))
+                    print ('[Source] step: [%d/%d] disc_loss: [%.6f] trans_loss: [%.6f] dec_loss: [%.6f] gen_loss: [%.6f]' % (step + 1, self.train_iter, discl, trl, decl, gl))
 
                 if (step + 1) % 200 == 0:
                     saver.save(sess, os.path.join(
-                        self.model_save_path, 'hirar'), global_step=step + 1)
+                        self.model_save_path, 'hirar%d' % self.feat_layer),
+                        global_step=step + 1)
                     print ('model/hirar%d-%d saved' % (self.feat_layer, step + 1))
 
                 if (step + 1) % 5000 == 0:
